@@ -21,6 +21,16 @@ const LEVEL_ES: Record<AlertLevel, string> = {
   watch: "VIGILANCIA",
 };
 
+/** Botones inline para que el vecino responda a la alerta. */
+const ACK_KEYBOARD = {
+  inline_keyboard: [
+    [
+      { text: "Estoy a salvo", callback_data: "ack:safe" },
+      { text: "Necesito ayuda", callback_data: "ack:help" },
+    ],
+  ],
+};
+
 /** Plantilla de alerta — respaldo determinista si la generación con LLM falla. */
 function buildTemplate(
   level: AlertLevel,
@@ -142,7 +152,11 @@ export async function dispatchAlerts(opts: {
 
     for (const sub of subs) {
       try {
-        await sendMessage({ chatId: sub.telegram_chat_id, text });
+        await sendMessage({
+          chatId: sub.telegram_chat_id,
+          text,
+          replyMarkup: ACK_KEYBOARD,
+        });
         await query(
           `insert into alert_deliveries (alert_id, telegram_chat_id, delivery_status)
            values ($1, $2, 'sent')`,

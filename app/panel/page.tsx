@@ -193,6 +193,40 @@ export default async function Panel() {
               <p style={{ color: "#6b7280" }}>Sin alertas emitidas.</p>
             )}
           </Card>
+
+          <Card title="Cola de ayuda">
+            {view.checkins.length > 0 ? (
+              <>
+                <div
+                  style={{
+                    marginBottom: ".5rem",
+                    fontWeight: 700,
+                    color: view.helpCount > 0 ? "#dc2626" : "#15803d",
+                  }}
+                >
+                  {view.helpCount}{" "}
+                  {view.helpCount === 1
+                    ? "vecino necesita ayuda"
+                    : "vecinos necesitan ayuda"}
+                </div>
+                {view.checkins.map((c, i) => (
+                  <Row
+                    key={i}
+                    label={c.status === "help" ? "Necesita ayuda" : "A salvo"}
+                    value={
+                      c.lat !== null && c.lon !== null
+                        ? `${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}`
+                        : "ubicación pendiente"
+                    }
+                  />
+                ))}
+              </>
+            ) : (
+              <p style={{ color: "#6b7280" }}>
+                Sin respuestas de vecinos todavía.
+              </p>
+            )}
+          </Card>
         </div>
 
         <Copilot />

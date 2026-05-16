@@ -235,3 +235,21 @@ create index idx_incidents_basin_status on incidents           (basin_id, status
 create index idx_edges_from            on edges                (from_node_id) where active;
 create index idx_zone_subs_zone        on zone_subscriptions   (zone_id) where active;
 create index idx_alert_deliveries_alert on alert_deliveries    (alert_id);
+
+-- ============================================================
+-- CHECK-INS CIUDADANOS (respuesta del vecino a una alerta)
+-- ============================================================
+
+create table citizen_checkins (
+  id               bigint generated always as identity primary key,
+  basin_id         bigint references basins(id) on delete cascade,
+  zone_id          bigint references zones(id) on delete set null,
+  telegram_chat_id text   not null,
+  status           text   not null check (status in ('safe','help')),
+  lat              numeric(9,6),
+  lon              numeric(9,6),
+  created_at       timestamptz not null default now()
+);
+
+create index idx_checkins_chat_time  on citizen_checkins (telegram_chat_id, created_at desc);
+create index idx_checkins_basin_time on citizen_checkins (basin_id, created_at desc);

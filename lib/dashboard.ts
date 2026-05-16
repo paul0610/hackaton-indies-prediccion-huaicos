@@ -22,22 +22,36 @@ export interface CoordinatorView {
   incident: { level: string; openedAt: string } | null;
   zones: { name: string; priority: number; safePoint: string | null }[];
   recentAlerts: { level: string; zone: string | null; sentAt: string | null }[];
+  checkins: {
+    status: string;
+    lat: number | null;
+    lon: number | null;
+    createdAt: string;
+  }[];
+  helpCount: number;
 }
 
 const n = (v: string | null | undefined): number =>
   v === null || v === undefined ? 0 : Number(v);
+
+const EMPTY: CoordinatorView = {
+  basin: null,
+  snapshot: null,
+  rain: null,
+  susceptibility: null,
+  incident: null,
+  zones: [],
+  recentAlerts: [],
+  checkins: [],
+  helpCount: 0,
+};
 
 /** Reúne todo lo que muestra el panel del coordinador (primera cuenca activa). */
 export async function getCoordinatorView(): Promise<CoordinatorView> {
   const basinRows = await query<{ id: string; name: string; slug: string }>(
     `select id, name, slug from basins where active order by id limit 1`,
   );
-  if (basinRows.length === 0) {
-    return {
-      basin: null, snapshot: null, rain: null,
-      susceptibility: null, incident: null, zones: [], recentAlerts: [],
-    };
-  }
+  if (basinRows.length === 0) return EMPTY;
   const basinId = Number(basinRows[0].id);
 
   const snap = await query<{
@@ -121,6 +135,21 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
     [basinId],
   );
 
+  const checkins = await query<{
+    status: string;
+    lat: string | null;
+    lon: string | null;
+    created_at: string;
+  }>(
+    `select distinct on (telegram_chat_id)
+            status, lat::text as lat, lon::text as lon,
+            created_at::text as created_at
+       from citizen_checkins
+      where basin_id = $1
+      order by telegram_chat_id, created_at desc`,
+    [basinId],
+  );
+
   return {
     basin: { name: basinRows[0].name, slug: basinRows[0].slug },
     snapshot:
@@ -166,5 +195,12 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
       zone: a.zone_name,
       sentAt: a.sent_at,
     })),
+    checkins: checkins.map((c) => ({
+      status: c.status,
+      lat: c.lat === null ? null : Number(c.lat),
+      lon: c.lon === null ? null : Number(c.lon),
+      createdAt: c.created_at,
+    })),
+    helpCount: checkins.filter((c) => c.status === "help").length,
   };
 }
