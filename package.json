@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "db:apply": "node --env-file=.env.local scripts/db-apply.mjs",
-    "set-webhook": "node --env-file=.env.local scripts/set-webhook.mjs"
+    "set-webhook": "node --env-file=.env.local scripts/set-webhook.mjs",
+    "run-replay": "node --env-file=.env.local scripts/run-replay.mjs"
   },
   "dependencies": {
     "@mistralai/mistralai": "^2.2.1",

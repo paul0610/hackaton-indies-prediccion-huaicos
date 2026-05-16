@@ -10,6 +10,9 @@ export default function Home() {
         Proyecto para <strong>hack@latam</strong> — track Environment &amp;
         Climate Risk.
       </p>
+      <p>
+        <a href="/panel">Abrir el panel del coordinador →</a>
+      </p>
     </main>
   );
 }
