@@ -1,0 +1,27 @@
+{
+  "name": "hackaton-indies-prediccion-huaicos",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "db:apply": "node --env-file=.env.local scripts/db-apply.mjs"
+  },
+  "dependencies": {
+    "@mistralai/mistralai": "^2.2.1",
+    "@supabase/supabase-js": "^2.105.4",
+    "next": "^16.2.6",
+    "pg": "^8.20.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "@types/pg": "^8.20.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "typescript": "^6.0.3"
+  }
+}
