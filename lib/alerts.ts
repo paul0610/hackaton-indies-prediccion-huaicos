@@ -1,5 +1,6 @@
 import { query } from "@/lib/db";
 import { sendMessage } from "@/lib/telegram";
+import { chatComplete } from "@/lib/mistral";
 import type { RiskLevel } from "@/lib/risk-engine";
 
 type AlertLevel = Exclude<RiskLevel, "clear">;
@@ -14,8 +15,14 @@ interface SubscriptionRow {
   telegram_chat_id: string;
 }
 
-/** Construye el texto de alerta para una zona, según el nivel de riesgo. */
-function buildMessage(
+const LEVEL_ES: Record<AlertLevel, string> = {
+  evacuate: "EVACUACIÓN",
+  prealert: "PREALERTA",
+  watch: "VIGILANCIA",
+};
+
+/** Plantilla de alerta — respaldo determinista si la generación con LLM falla. */
+function buildTemplate(
   level: AlertLevel,
   basinName: string,
   zoneName: string,
@@ -49,9 +56,47 @@ function buildMessage(
   );
 }
 
+/** Genera el texto de la alerta con Mistral; usa la plantilla como respaldo. */
+async function generateMessage(
+  level: AlertLevel,
+  basinName: string,
+  zoneName: string,
+  safePoint: string | null,
+  etaMin: number,
+): Promise<string> {
+  try {
+    const sp = safePoint ?? "el punto seguro asignado";
+    const intent =
+      level === "evacuate"
+        ? "Es una orden de evacuar de inmediato; el riesgo está confirmado."
+        : level === "prealert"
+          ? "Es una prealerta: el vecino debe prepararse para evacuar; aún no es la orden final."
+          : "Es una vigilancia: la señal no está confirmada; el vecino debe mantenerse atento.";
+    const system =
+      `Eres el sistema de alerta temprana de huaicos de ${basinName}. ` +
+      "Redactas mensajes de alerta para vecinos que se envían por Telegram. " +
+      "Tono urgente pero calmado, claro y accionable, sin tecnicismos. Español de Perú. " +
+      "Máximo 55 palabras. Sin emojis. La primera línea es el nivel y la cuenca en " +
+      "<b>negrita</b> (formato HTML de Telegram).";
+    const user =
+      `Nivel: ${LEVEL_ES[level]}. Zona: ${zoneName}. Punto seguro: ${sp}. ` +
+      `Tiempo estimado de impacto: ${etaMin} minutos. ${intent}`;
+    return await chatComplete(
+      [
+        { role: "system", content: system },
+        { role: "user", content: user },
+      ],
+      { maxTokens: 220, temperature: 0.4 },
+    );
+  } catch (err) {
+    console.error("Generación de alerta con Mistral falló, uso plantilla:", err);
+    return buildTemplate(level, basinName, zoneName, safePoint, etaMin);
+  }
+}
+
 /**
- * Despacha las alertas de un incidente: por cada zona de la cuenca crea un
- * registro en `alerts`, envía el mensaje por Telegram a los suscriptores
+ * Despacha las alertas de un incidente: por cada zona genera el texto con
+ * Mistral, lo registra en `alerts`, lo envía por Telegram a los suscriptores
  * y registra cada entrega en `alert_deliveries`.
  */
 export async function dispatchAlerts(opts: {
@@ -72,7 +117,7 @@ export async function dispatchAlerts(opts: {
   let failed = 0;
 
   for (const zone of zones) {
-    const text = buildMessage(
+    const text = await generateMessage(
       opts.level,
       opts.basinName,
       zone.name,

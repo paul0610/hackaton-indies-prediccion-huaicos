@@ -1,5 +1,6 @@
 import { getCoordinatorView } from "@/lib/dashboard";
 import { AutoRefresh } from "./auto-refresh";
+import { Copilot } from "./copilot";
 
 export const dynamic = "force-dynamic";
 
@@ -193,6 +194,8 @@ export default async function Panel() {
             )}
           </Card>
         </div>
+
+        <Copilot />
       </div>
     </main>
   );
