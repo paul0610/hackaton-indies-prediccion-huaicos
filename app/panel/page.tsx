@@ -1,6 +1,7 @@
 import { getCoordinatorView } from "@/lib/dashboard";
 import { AutoRefresh } from "./auto-refresh";
 import { Copilot } from "./copilot";
+import { RiskMap, type MapPoint } from "./risk-map";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,25 @@ export default async function Panel() {
   const lv = LEVEL[level] ?? LEVEL.clear;
   const snap = view.snapshot;
 
+  const mapPoints: MapPoint[] = [
+    ...view.zones
+      .filter((z) => z.safePointLat !== null && z.safePointLon !== null)
+      .map((z): MapPoint => ({
+        lat: z.safePointLat as number,
+        lon: z.safePointLon as number,
+        kind: "safe-point",
+        label: `Punto seguro · ${z.name}`,
+      })),
+    ...view.checkins
+      .filter((c) => c.lat !== null && c.lon !== null)
+      .map((c): MapPoint => ({
+        lat: c.lat as number,
+        lon: c.lon as number,
+        kind: c.status === "help" ? "help" : "safe",
+        label: c.status === "help" ? "Vecino: necesita ayuda" : "Vecino: a salvo",
+      })),
+  ];
+
   return (
     <main
       style={{
@@ -108,6 +128,21 @@ export default async function Panel() {
             </div>
           )}
         </div>
+
+        <section style={{ margin: "1.25rem 0" }}>
+          <h2
+            style={{
+              margin: "0 0 .5rem",
+              fontSize: 13,
+              textTransform: "uppercase",
+              letterSpacing: ".06em",
+              color: "#6b7280",
+            }}
+          >
+            Mapa de monitoreo
+          </h2>
+          <RiskMap center={[-11.936, -76.697]} points={mapPoints} />
+        </section>
 
         <div
           style={{

@@ -20,7 +20,13 @@ export interface CoordinatorView {
   } | null;
   susceptibility: { score: number; band: string | null } | null;
   incident: { level: string; openedAt: string } | null;
-  zones: { name: string; priority: number; safePoint: string | null }[];
+  zones: {
+    name: string;
+    priority: number;
+    safePoint: string | null;
+    safePointLat: number | null;
+    safePointLon: number | null;
+  }[];
   recentAlerts: { level: string; zone: string | null; sentAt: string | null }[];
   checkins: {
     status: string;
@@ -33,6 +39,9 @@ export interface CoordinatorView {
 
 const n = (v: string | null | undefined): number =>
   v === null || v === undefined ? 0 : Number(v);
+
+const numOrNull = (v: string | null): number | null =>
+  v === null ? null : Number(v);
 
 const EMPTY: CoordinatorView = {
   basin: null,
@@ -113,8 +122,12 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
     name: string;
     priority: number;
     safe_point_name: string | null;
+    safe_point_lat: string | null;
+    safe_point_lon: string | null;
   }>(
-    `select name, priority, safe_point_name
+    `select name, priority, safe_point_name,
+            safe_point_lat::text as safe_point_lat,
+            safe_point_lon::text as safe_point_lon
        from zones
       where basin_id = $1 and active
       order by priority asc`,
@@ -189,6 +202,8 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
       name: z.name,
       priority: z.priority,
       safePoint: z.safe_point_name,
+      safePointLat: numOrNull(z.safe_point_lat),
+      safePointLon: numOrNull(z.safe_point_lon),
     })),
     recentAlerts: alerts.map((a) => ({
       level: a.level,
@@ -197,8 +212,8 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
     })),
     checkins: checkins.map((c) => ({
       status: c.status,
-      lat: c.lat === null ? null : Number(c.lat),
-      lon: c.lon === null ? null : Number(c.lon),
+      lat: numOrNull(c.lat),
+      lon: numOrNull(c.lon),
       createdAt: c.created_at,
     })),
     helpCount: checkins.filter((c) => c.status === "help").length,
