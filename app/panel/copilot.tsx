@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 
-// Copiloto del coordinador: pregunta en lenguaje natural sobre el estado
-// actual; la respuesta la genera Mistral con el contexto en vivo.
+// Copiloto agéntico del coordinador: pregunta en lenguaje natural; un agente
+// Mistral decide qué herramientas del sistema consultar y razona la respuesta.
 export function Copilot() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
+  const [toolsUsed, setToolsUsed] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
   async function ask() {
@@ -14,6 +15,7 @@ export function Copilot() {
     if (!q || loading) return;
     setLoading(true);
     setAnswer(null);
+    setToolsUsed([]);
     try {
       const res = await fetch("/api/copilot", {
         method: "POST",
@@ -21,7 +23,12 @@ export function Copilot() {
         body: JSON.stringify({ question: q }),
       });
       const data = await res.json();
-      setAnswer(data.ok ? data.answer : `Error: ${data.error ?? "desconocido"}`);
+      if (data.ok) {
+        setAnswer(data.answer);
+        setToolsUsed(Array.isArray(data.toolsUsed) ? data.toolsUsed : []);
+      } else {
+        setAnswer(`Error: ${data.error ?? "desconocido"}`);
+      }
     } catch {
       setAnswer("Error de conexión con el copiloto.");
     } finally {
@@ -48,7 +55,7 @@ export function Copilot() {
           color: "#6b7280",
         }}
       >
-        Copiloto del coordinador · IA
+        Copiloto del coordinador · agente IA
       </h2>
       <div style={{ display: "flex", gap: 8 }}>
         <input
@@ -87,9 +94,14 @@ export function Copilot() {
           {answer}
         </p>
       )}
+      {toolsUsed.length > 0 && (
+        <div style={{ marginTop: ".4rem", fontSize: 12, color: "#9ca3af" }}>
+          El agente consultó: {toolsUsed.join(", ")}
+        </div>
+      )}
       <div style={{ marginTop: ".5rem", fontSize: 12, color: "#9ca3af" }}>
-        Ej.: &quot;¿cuál es el riesgo actual?&quot; · &quot;¿qué zonas hay y sus
-        puntos seguros?&quot; · &quot;¿por qué se disparó la alerta?&quot;
+        Ej.: &quot;resume la situación&quot; · &quot;¿cuántos necesitan ayuda y
+        dónde?&quot; · &quot;¿qué zona priorizo?&quot;
       </div>
     </section>
   );

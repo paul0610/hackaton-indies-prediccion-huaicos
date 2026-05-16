@@ -1,11 +1,35 @@
 import { NextResponse } from "next/server";
 import { getCoordinatorView } from "@/lib/dashboard";
-import { chatComplete } from "@/lib/mistral";
+import { runAgent, type AgentTool } from "@/lib/mistral";
 
 export const dynamic = "force-dynamic";
 
-// Copiloto del coordinador (Capa H): responde preguntas sobre el estado
-// actual usando Mistral con el contexto en vivo del panel.
+// Herramientas que el copiloto agéntico puede consultar.
+const TOOLS: AgentTool[] = [
+  {
+    name: "obtener_estado_actual",
+    description:
+      "Nivel de riesgo actual, umbral efectivo, lluvia reciente, susceptibilidad e incidente abierto.",
+    parameters: { type: "object", properties: {} },
+  },
+  {
+    name: "listar_zonas",
+    description: "Zonas pobladas de la cuenca con su prioridad y punto seguro.",
+    parameters: { type: "object", properties: {} },
+  },
+  {
+    name: "obtener_cola_de_ayuda",
+    description:
+      "Vecinos que respondieron a la alerta, su estado (a salvo / necesita ayuda), su ubicación y cuántos necesitan ayuda.",
+    parameters: { type: "object", properties: {} },
+  },
+  {
+    name: "obtener_alertas_recientes",
+    description: "Últimas alertas emitidas por el sistema.",
+    parameters: { type: "object", properties: {} },
+  },
+];
+
 export async function POST(req: Request) {
   try {
     const body = (await req.json().catch(() => ({}))) as { question?: unknown };
@@ -19,23 +43,46 @@ export async function POST(req: Request) {
     }
 
     const view = await getCoordinatorView();
+
+    const execute = async (name: string): Promise<string> => {
+      switch (name) {
+        case "obtener_estado_actual":
+          return JSON.stringify({
+            basin: view.basin,
+            snapshot: view.snapshot,
+            rain: view.rain,
+            susceptibility: view.susceptibility,
+            incident: view.incident,
+          });
+        case "listar_zonas":
+          return JSON.stringify(view.zones);
+        case "obtener_cola_de_ayuda":
+          return JSON.stringify({
+            helpCount: view.helpCount,
+            checkins: view.checkins,
+          });
+        case "obtener_alertas_recientes":
+          return JSON.stringify(view.recentAlerts);
+        default:
+          return "Herramienta desconocida.";
+      }
+    };
+
     const system =
       "Eres el copiloto del coordinador de emergencias de un sistema de alerta " +
-      "temprana de huaicos. Respondes preguntas sobre el estado actual usando " +
-      "ÚNICAMENTE el contexto JSON proporcionado. Sé breve, claro y operativo. " +
-      "Español. Si un dato no está en el contexto, dilo con franqueza.";
-    const answer = await chatComplete(
-      [
-        { role: "system", content: system },
-        {
-          role: "user",
-          content: `Estado actual (JSON):\n${JSON.stringify(view)}\n\nPregunta: ${question}`,
-        },
-      ],
-      { maxTokens: 350 },
-    );
+      "temprana de huaicos (Quebrada Quirio, Chosica). Tienes herramientas para " +
+      "consultar el estado del sistema en vivo: úsalas para responder con datos " +
+      "reales, nunca inventes. Puedes llamar varias herramientas si hace falta. " +
+      "Responde breve, claro y operativo, en español.";
 
-    return NextResponse.json({ ok: true, answer });
+    const { answer, toolsUsed } = await runAgent({
+      system,
+      user: question,
+      tools: TOOLS,
+      execute,
+    });
+
+    return NextResponse.json({ ok: true, answer, toolsUsed });
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: (err as Error).message },
