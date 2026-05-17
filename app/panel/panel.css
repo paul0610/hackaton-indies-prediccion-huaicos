@@ -126,9 +126,9 @@
 }
 .demo-tag {
   font-family: var(--font-mono); font-size: 9px; font-weight: 700;
-  letter-spacing: 0.14em; color: var(--ink-3);
-  border: 1px solid var(--border-strong); border-radius: 4px;
-  padding: 2px 5px;
+  letter-spacing: 0.14em; color: var(--amber);
+  border: 1px solid rgba(245, 200, 75, 0.55); border-radius: 4px;
+  background: var(--amber-soft); padding: 2px 5px;
 }
 .demo-btn {
   background: var(--bg-3); color: var(--ink-1);
