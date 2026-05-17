@@ -1,67 +1,43 @@
+import "./panel.css";
 import { getCoordinatorView } from "@/lib/dashboard";
 import { AutoRefresh } from "./auto-refresh";
 import { Copilot } from "./copilot";
-import { RiskMap, type MapPoint } from "./risk-map";
+import {
+  RiskMap,
+  type MapZone,
+  type MapCheckin,
+  type MapSafePoint,
+} from "./risk-map";
+import { Clock, Elapsed } from "./live";
 
 export const dynamic = "force-dynamic";
 
-const LEVEL: Record<string, { bg: string; label: string }> = {
-  clear: { bg: "#15803d", label: "SIN RIESGO" },
-  watch: { bg: "#ca8a04", label: "VIGILANCIA" },
-  prealert: { bg: "#ea580c", label: "PREALERTA" },
-  evacuate: { bg: "#dc2626", label: "EVACUACIÓN" },
+const LEVEL: Record<
+  string,
+  { label: string; sev: string; chip: string; cls: string; dot: string }
+> = {
+  clear: { label: "SIN RIESGO", sev: "N0", chip: "green", cls: "lv-clear", dot: "green" },
+  watch: { label: "VIGILANCIA", sev: "N1", chip: "amber", cls: "lv-watch", dot: "amber" },
+  prealert: { label: "PREALERTA", sev: "N2", chip: "orange", cls: "lv-prealert", dot: "orange" },
+  evacuate: { label: "EVACUACIÓN", sev: "N3", chip: "red", cls: "lv-evacuate", dot: "" },
+};
+
+const HERO: Record<string, { eyebrow: string; state: string }> = {
+  clear: { eyebrow: "Monitoreo activo · sin alerta", state: "condiciones normales" },
+  watch: { eyebrow: "Señal en revisión", state: "vigilancia preventiva" },
+  prealert: { eyebrow: "Riesgo elevado", state: "prealerta activa" },
+  evacuate: { eyebrow: "Riesgo crítico · en curso", state: "evacuación activa" },
 };
 
 function fmt(ts: string | null): string {
-  if (!ts) return "—";
-  return ts.slice(0, 16);
+  return ts ? ts.slice(0, 16).replace("T", " ") : "—";
 }
 
-function Card({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function DataRow({ k, v }: { k: string; v: React.ReactNode }) {
   return (
-    <section
-      style={{
-        background: "#ffffff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        padding: "1rem 1.25rem",
-      }}
-    >
-      <h2
-        style={{
-          margin: "0 0 .6rem",
-          fontSize: 13,
-          textTransform: "uppercase",
-          letterSpacing: ".06em",
-          color: "#6b7280",
-        }}
-      >
-        {title}
-      </h2>
-      {children}
-    </section>
-  );
-}
-
-function Row({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        gap: "1rem",
-        padding: ".3rem 0",
-        borderBottom: "1px solid #f3f4f6",
-      }}
-    >
-      <span style={{ color: "#6b7280" }}>{label}</span>
-      <strong style={{ textAlign: "right" }}>{value}</strong>
+    <div className="data-row">
+      <span className="dr-k">{k}</span>
+      <span className="dr-v">{v}</span>
     </div>
   );
 }
@@ -70,201 +46,369 @@ export default async function Panel() {
   const view = await getCoordinatorView();
   const level = view.snapshot?.riskLevel ?? "clear";
   const lv = LEVEL[level] ?? LEVEL.clear;
+  const hero = HERO[level] ?? HERO.clear;
   const snap = view.snapshot;
+  const basinName = view.basin?.name ?? "Sin cuenca";
+  const tone = `t-${lv.dot || "red"}`;
+  const dotCls = `tp-dot${lv.dot ? " " + lv.dot : ""}`;
 
-  const mapPoints: MapPoint[] = [
-    ...view.zones
-      .filter((z) => z.safePointLat !== null && z.safePointLon !== null)
-      .map((z): MapPoint => ({
-        lat: z.safePointLat as number,
-        lon: z.safePointLon as number,
-        kind: "safe-point",
-        label: `Punto seguro · ${z.name}`,
-      })),
-    ...view.checkins
-      .filter((c) => c.lat !== null && c.lon !== null)
-      .map((c): MapPoint => ({
-        lat: c.lat as number,
-        lon: c.lon as number,
-        kind: c.status === "help" ? "help" : "safe",
-        label: c.status === "help" ? "Vecino: necesita ayuda" : "Vecino: a salvo",
-      })),
-  ];
+  const totalPop = view.zones.reduce((s, z) => s + (z.population ?? 0), 0);
+  const triggers: string[] = snap
+    ? [
+        snap.rainTriggered ? "lluvia" : null,
+        snap.officialTriggered ? "oficial" : null,
+        snap.citizenTriggered ? "ciudadano" : null,
+      ].filter((x): x is string => x !== null)
+    : [];
+
+  const mapZones: MapZone[] = view.zones
+    .filter((z) => z.entryLat !== null && z.entryLon !== null)
+    .map((z) => ({
+      name: z.name,
+      lat: z.entryLat as number,
+      lon: z.entryLon as number,
+      helpCount: z.helpCount,
+      safeCount: z.safeCount,
+    }));
+  const mapCheckins: MapCheckin[] = view.checkins
+    .filter((c) => c.lat !== null && c.lon !== null)
+    .map((c) => ({
+      lat: c.lat as number,
+      lon: c.lon as number,
+      status: c.status,
+    }));
+  const mapSafePoints: MapSafePoint[] = view.zones
+    .filter((z) => z.safePointLat !== null && z.safePointLon !== null)
+    .map((z) => ({
+      lat: z.safePointLat as number,
+      lon: z.safePointLon as number,
+      name: z.safePoint ?? z.name,
+    }));
+
+  const queue = [...view.checkins].sort((a, b) =>
+    a.status === b.status ? 0 : a.status === "help" ? -1 : 1,
+  );
 
   return (
-    <main
-      style={{
-        minHeight: "100vh",
-        background: "#f9fafb",
-        color: "#111827",
-        fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-      }}
-    >
+    <main className="tp-app">
       <AutoRefresh seconds={6} />
-      <div style={{ maxWidth: 860, margin: "0 auto", padding: "2rem 1.25rem" }}>
-        <h1 style={{ margin: 0, fontSize: 24 }}>Panel del Coordinador</h1>
-        <p style={{ marginTop: 4, color: "#6b7280" }}>
-          {view.basin?.name ?? "Sin cuenca"} · actualización automática cada 6 s
-        </p>
 
-        <div
-          style={{
-            background: lv.bg,
-            color: "#ffffff",
-            borderRadius: 14,
-            padding: "1.5rem 1.75rem",
-            margin: "1.25rem 0",
-          }}
-        >
-          <div style={{ fontSize: 13, letterSpacing: ".08em", opacity: 0.85 }}>
-            NIVEL DE RIESGO ACTUAL
-          </div>
-          <div style={{ fontSize: 42, fontWeight: 800, lineHeight: 1.1 }}>
-            {lv.label}
-          </div>
-          {snap && (
-            <div style={{ marginTop: ".5rem", opacity: 0.95 }}>
-              {snap.explanation}
-            </div>
-          )}
-        </div>
+      <header className="chrome">
+        <span className="logo">
+          <span className="mark" />
+          Tempestas
+        </span>
+        <span className="sep" />
+        <span style={{ color: "var(--ink-1)" }}>Panel de coordinación</span>
+        <span style={{ color: "var(--ink-3)" }}>/</span>
+        <span>{basinName}</span>
+        <span className="spacer" />
+        <span className={`chip ${lv.chip}`}>
+          <span className={dotCls} style={{ width: 8, height: 8 }} />
+          {lv.label}
+        </span>
+        <span className="chip cyan">⟳ Auto-refresh 6 s</span>
+        <Clock />
+      </header>
 
-        <section style={{ margin: "1.25rem 0" }}>
-          <h2
-            style={{
-              margin: "0 0 .5rem",
-              fontSize: 13,
-              textTransform: "uppercase",
-              letterSpacing: ".06em",
-              color: "#6b7280",
-            }}
-          >
-            Mapa de monitoreo
-          </h2>
-          <RiskMap center={[-11.936, -76.697]} points={mapPoints} />
-        </section>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
-            gap: 16,
-          }}
-        >
-          <Card title="Predicción">
-            {snap ? (
-              <>
-                <Row label="Lluvia 3 h" value={`${view.rain?.rain3hMm ?? 0} mm`} />
-                <Row label="Lluvia 6 h" value={`${view.rain?.rain6hMm ?? 0} mm`} />
-                <Row
-                  label="Lluvia 24 h"
-                  value={`${view.rain?.rain24hMm ?? 0} mm`}
-                />
-                <Row
-                  label="Umbral efectivo 3 h"
-                  value={`${snap.effectiveThreshold3hMm} mm`}
-                />
-                <Row
-                  label="Susceptibilidad ML"
-                  value={
-                    view.susceptibility
-                      ? `${view.susceptibility.score} (${view.susceptibility.band ?? "—"})`
-                      : "—"
-                  }
-                />
-                <Row
-                  label="Disparadores"
-                  value={
-                    [
-                      snap.rainTriggered ? "lluvia" : null,
-                      snap.officialTriggered ? "oficial" : null,
-                      snap.citizenTriggered ? "ciudadano" : null,
-                    ]
-                      .filter(Boolean)
-                      .join(", ") || "ninguno"
-                  }
-                />
-                <Row label="Último cálculo" value={fmt(snap.computedAt)} />
-              </>
-            ) : (
-              <p style={{ color: "#6b7280" }}>Aún sin evaluación de riesgo.</p>
-            )}
-          </Card>
-
-          <Card title="Incidente">
-            {view.incident ? (
-              <>
-                <Row
-                  label="Nivel"
-                  value={(LEVEL[view.incident.level] ?? lv).label}
-                />
-                <Row label="Abierto desde" value={fmt(view.incident.openedAt)} />
-              </>
-            ) : (
-              <p style={{ color: "#6b7280" }}>Sin incidente abierto.</p>
-            )}
-          </Card>
-
-          <Card title="Zonas">
-            {view.zones.length > 0 ? (
-              view.zones.map((z) => (
-                <Row key={z.name} label={z.name} value={z.safePoint ?? "—"} />
-              ))
-            ) : (
-              <p style={{ color: "#6b7280" }}>Sin zonas configuradas.</p>
-            )}
-          </Card>
-
-          <Card title="Alertas recientes">
-            {view.recentAlerts.length > 0 ? (
-              view.recentAlerts.map((a, i) => (
-                <Row
-                  key={i}
-                  label={`${(LEVEL[a.level] ?? lv).label} · ${a.zone ?? "—"}`}
-                  value={fmt(a.sentAt)}
-                />
-              ))
-            ) : (
-              <p style={{ color: "#6b7280" }}>Sin alertas emitidas.</p>
-            )}
-          </Card>
-
-          <Card title="Cola de ayuda">
-            {view.checkins.length > 0 ? (
-              <>
+      <div className="tp-main">
+        {/* ─── Fila 1: hero + KPIs ─── */}
+        <section className="row-1">
+          <div className={`hero ${lv.cls}`}>
+            <span className="stripe-l" />
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 18,
+                alignItems: "flex-start",
+              }}
+            >
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                  <span className={dotCls} />
+                  <span className={`eyebrow ${tone}`}>{hero.eyebrow}</span>
+                </div>
+                <h1>
+                  {basinName}: {hero.state}
+                </h1>
+                <p>{snap?.explanation ?? "Aún sin evaluación de riesgo."}</p>
                 <div
                   style={{
-                    marginBottom: ".5rem",
-                    fontWeight: 700,
-                    color: view.helpCount > 0 ? "#dc2626" : "#15803d",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 6,
+                    marginTop: 14,
                   }}
                 >
-                  {view.helpCount}{" "}
-                  {view.helpCount === 1
-                    ? "vecino necesita ayuda"
-                    : "vecinos necesitan ayuda"}
+                  {triggers.length > 0 ? (
+                    triggers.map((t) => (
+                      <span key={t} className="chip" style={{ fontSize: 11 }}>
+                        disparador: {t}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="chip" style={{ fontSize: 11 }}>
+                      sin disparadores activos
+                    </span>
+                  )}
+                  {view.incident && (
+                    <span className="chip cyan" style={{ fontSize: 11 }}>
+                      detectado <Elapsed since={view.incident.openedAt} />
+                    </span>
+                  )}
                 </div>
-                {view.checkins.map((c, i) => (
-                  <Row
-                    key={i}
-                    label={c.status === "help" ? "Necesita ayuda" : "A salvo"}
-                    value={
-                      c.lat !== null && c.lon !== null
-                        ? `${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}`
-                        : "ubicación pendiente"
+              </div>
+              <div style={{ textAlign: "right", flexShrink: 0 }}>
+                <div className={`sev ${tone}`}>{lv.sev}</div>
+                <div className="label" style={{ marginTop: 4 }}>
+                  Severidad
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="label">Población expuesta</div>
+            <div className="big-num" style={{ marginTop: 14 }}>
+              {totalPop.toLocaleString("es-PE")}
+            </div>
+            <div className="kpi-foot">
+              {view.zones.length} zonas monitoreadas
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="label">Ayuda pendiente</div>
+            <div
+              className={`big-num ${view.helpCount > 0 ? "t-red" : "t-green"}`}
+              style={{ marginTop: 14 }}
+            >
+              {String(view.helpCount).padStart(2, "0")}
+            </div>
+            <div className="kpi-foot">
+              de {view.checkins.length} vecinos que respondieron
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="label">Lluvia · 3 h</div>
+            <div
+              className="big-num t-cyan"
+              style={{ marginTop: 14, fontSize: 40 }}
+            >
+              {view.rain?.rain3hMm ?? 0}
+              <span style={{ fontSize: 16, color: "var(--ink-2)" }}> mm</span>
+            </div>
+            <div className="kpi-foot">
+              umbral efectivo {snap ? `${snap.effectiveThreshold3hMm} mm` : "—"}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Fila 2: mapa + columna derecha ─── */}
+        <section className="row-2">
+          <RiskMap
+            center={[-11.936, -76.697]}
+            zones={mapZones}
+            checkins={mapCheckins}
+            safePoints={mapSafePoints}
+          />
+          <div className="right-col">
+            <Copilot />
+            <div className="card">
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                }}
+              >
+                <span className="section-title">Cola de ayuda</span>
+                <span
+                  className={`chip ${view.helpCount > 0 ? "orange" : "green"}`}
+                  style={{ fontSize: 10, padding: "3px 8px" }}
+                >
+                  {view.helpCount} pendiente(s)
+                </span>
+              </div>
+              {queue.length > 0 ? (
+                <div className="queue-list">
+                  {queue.map((c, i) => (
+                    <div
+                      key={i}
+                      className={`case ${
+                        c.status === "help" ? "s-help" : "s-safe"
+                      }`}
+                    >
+                      <div className="bar" />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            display: "flex",
+                            justifyContent: "space-between",
+                            gap: 8,
+                          }}
+                        >
+                          <span
+                            className={`mono ${
+                              c.status === "help" ? "t-red" : "t-green"
+                            }`}
+                            style={{ fontSize: 12, fontWeight: 600 }}
+                          >
+                            {c.status === "help" ? "NECESITA AYUDA" : "A SALVO"}
+                          </span>
+                          <span
+                            className="mono t-ink2"
+                            style={{ fontSize: 11 }}
+                          >
+                            <Elapsed since={c.createdAt} />
+                          </span>
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 12,
+                            color: "var(--ink-2)",
+                            marginTop: 4,
+                          }}
+                        >
+                          {c.lat !== null && c.lon !== null
+                            ? `Ubicación ${c.lat.toFixed(4)}, ${c.lon.toFixed(4)}`
+                            : "Ubicación pendiente"}
+                          {c.status === "help" &&
+                            " · brigada comunitaria por asignar"}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p
+                  style={{
+                    color: "var(--ink-3)",
+                    fontSize: 13,
+                    marginTop: 12,
+                  }}
+                >
+                  Sin respuestas de vecinos todavía.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Fila 3: tarjetas de detalle ─── */}
+        <section className="row-3">
+          <div className="card">
+            <div className="label">Predicción</div>
+            <div style={{ marginTop: 12 }}>
+              {snap ? (
+                <>
+                  <DataRow k="Lluvia 3 h" v={`${view.rain?.rain3hMm ?? 0} mm`} />
+                  <DataRow k="Lluvia 6 h" v={`${view.rain?.rain6hMm ?? 0} mm`} />
+                  <DataRow
+                    k="Lluvia 24 h"
+                    v={`${view.rain?.rain24hMm ?? 0} mm`}
+                  />
+                  <DataRow
+                    k="Umbral efectivo 3 h"
+                    v={`${snap.effectiveThreshold3hMm} mm`}
+                  />
+                  <DataRow
+                    k="Susceptibilidad"
+                    v={
+                      view.susceptibility
+                        ? `${view.susceptibility.score} (${
+                            view.susceptibility.band ?? "—"
+                          })`
+                        : "—"
                     }
                   />
-                ))}
-              </>
-            ) : (
-              <p style={{ color: "#6b7280" }}>
-                Sin respuestas de vecinos todavía.
-              </p>
-            )}
-          </Card>
-        </div>
+                  <DataRow
+                    k="Disparadores"
+                    v={triggers.length > 0 ? triggers.join(", ") : "ninguno"}
+                  />
+                  <DataRow k="Último cálculo" v={fmt(snap.computedAt)} />
+                </>
+              ) : (
+                <p style={{ color: "var(--ink-3)", fontSize: 13 }}>
+                  Aún sin evaluación de riesgo.
+                </p>
+              )}
+            </div>
+          </div>
 
-        <Copilot />
+          <div className="card">
+            <div className="label">Incidente</div>
+            <div style={{ marginTop: 12 }}>
+              {view.incident ? (
+                <>
+                  <DataRow
+                    k="Nivel"
+                    v={(LEVEL[view.incident.level] ?? lv).label}
+                  />
+                  <DataRow
+                    k="Abierto"
+                    v={<Elapsed since={view.incident.openedAt} />}
+                  />
+                  <DataRow k="Desde" v={fmt(view.incident.openedAt)} />
+                </>
+              ) : (
+                <p style={{ color: "var(--ink-3)", fontSize: 13 }}>
+                  Sin incidente abierto.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="label">Alertas recientes</div>
+            <div style={{ marginTop: 12 }}>
+              {view.recentAlerts.length > 0 ? (
+                view.recentAlerts.map((a, i) => (
+                  <DataRow
+                    key={i}
+                    k={`${(LEVEL[a.level] ?? lv).label} · ${a.zone ?? "—"}`}
+                    v={fmt(a.sentAt)}
+                  />
+                ))
+              ) : (
+                <p style={{ color: "var(--ink-3)", fontSize: 13 }}>
+                  Sin alertas emitidas.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="label">Zonas</div>
+            <div style={{ marginTop: 12 }}>
+              {view.zones.length > 0 ? (
+                view.zones.map((z) => (
+                  <DataRow
+                    key={z.id}
+                    k={z.name}
+                    v={
+                      <span className="mono" style={{ fontSize: 12 }}>
+                        {z.population
+                          ? z.population.toLocaleString("es-PE")
+                          : "—"}{" "}
+                        hab ·{" "}
+                        <span className={z.helpCount > 0 ? "t-red" : "t-ink2"}>
+                          {z.helpCount} ayuda
+                        </span>
+                      </span>
+                    }
+                  />
+                ))
+              ) : (
+                <p style={{ color: "var(--ink-3)", fontSize: 13 }}>
+                  Sin zonas configuradas.
+                </p>
+              )}
+            </div>
+          </div>
+        </section>
       </div>
     </main>
   );

@@ -21,15 +21,23 @@ export interface CoordinatorView {
   susceptibility: { score: number; band: string | null } | null;
   incident: { level: string; openedAt: string } | null;
   zones: {
+    id: number;
+    code: string;
     name: string;
     priority: number;
+    population: number | null;
     safePoint: string | null;
     safePointLat: number | null;
     safePointLon: number | null;
+    entryLat: number | null;
+    entryLon: number | null;
+    helpCount: number;
+    safeCount: number;
   }[];
   recentAlerts: { level: string; zone: string | null; sentAt: string | null }[];
   checkins: {
     status: string;
+    zoneId: number | null;
     lat: number | null;
     lon: number | null;
     createdAt: string;
@@ -42,6 +50,16 @@ const n = (v: string | null | undefined): number =>
 
 const numOrNull = (v: string | null): number | null =>
   v === null ? null : Number(v);
+
+/**
+ * Población estimada por zona del piloto (dato de planificación).
+ * Aproximado para Chosica/Quirio; calibrar con censo INEI antes de uso operativo.
+ */
+const ZONE_POPULATION: Record<string, number> = {
+  NP: 1200,
+  LP: 950,
+  LC: 1400,
+};
 
 const EMPTY: CoordinatorView = {
   basin: null,
@@ -119,18 +137,25 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
   );
 
   const zones = await query<{
+    id: string;
+    code: string;
     name: string;
     priority: number;
     safe_point_name: string | null;
     safe_point_lat: string | null;
     safe_point_lon: string | null;
+    entry_lat: string | null;
+    entry_lon: string | null;
   }>(
-    `select name, priority, safe_point_name,
-            safe_point_lat::text as safe_point_lat,
-            safe_point_lon::text as safe_point_lon
-       from zones
-      where basin_id = $1 and active
-      order by priority asc`,
+    `select z.id, z.code, z.name, z.priority, z.safe_point_name,
+            z.safe_point_lat::text as safe_point_lat,
+            z.safe_point_lon::text as safe_point_lon,
+            en.lat::text as entry_lat,
+            en.lon::text as entry_lon
+       from zones z
+       left join nodes en on en.id = z.entry_node_id
+      where z.basin_id = $1 and z.active
+      order by z.priority asc`,
     [basinId],
   );
 
@@ -150,18 +175,27 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
 
   const checkins = await query<{
     status: string;
+    zone_id: string | null;
     lat: string | null;
     lon: string | null;
     created_at: string;
   }>(
     `select distinct on (telegram_chat_id)
-            status, lat::text as lat, lon::text as lon,
+            status, zone_id, lat::text as lat, lon::text as lon,
             created_at::text as created_at
        from citizen_checkins
       where basin_id = $1
       order by telegram_chat_id, created_at desc`,
     [basinId],
   );
+
+  const checkinList = checkins.map((c) => ({
+    status: c.status,
+    zoneId: c.zone_id === null ? null : Number(c.zone_id),
+    lat: numOrNull(c.lat),
+    lon: numOrNull(c.lon),
+    createdAt: c.created_at,
+  }));
 
   return {
     basin: { name: basinRows[0].name, slug: basinRows[0].slug },
@@ -198,24 +232,30 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
       incident.length > 0
         ? { level: incident[0].current_level, openedAt: incident[0].opened_at }
         : null,
-    zones: zones.map((z) => ({
-      name: z.name,
-      priority: z.priority,
-      safePoint: z.safe_point_name,
-      safePointLat: numOrNull(z.safe_point_lat),
-      safePointLon: numOrNull(z.safe_point_lon),
-    })),
+    zones: zones.map((z) => {
+      const zoneId = Number(z.id);
+      const zc = checkinList.filter((c) => c.zoneId === zoneId);
+      return {
+        id: zoneId,
+        code: z.code,
+        name: z.name,
+        priority: z.priority,
+        population: ZONE_POPULATION[z.code] ?? null,
+        safePoint: z.safe_point_name,
+        safePointLat: numOrNull(z.safe_point_lat),
+        safePointLon: numOrNull(z.safe_point_lon),
+        entryLat: numOrNull(z.entry_lat),
+        entryLon: numOrNull(z.entry_lon),
+        helpCount: zc.filter((c) => c.status === "help").length,
+        safeCount: zc.filter((c) => c.status === "safe").length,
+      };
+    }),
     recentAlerts: alerts.map((a) => ({
       level: a.level,
       zone: a.zone_name,
       sentAt: a.sent_at,
     })),
-    checkins: checkins.map((c) => ({
-      status: c.status,
-      lat: numOrNull(c.lat),
-      lon: numOrNull(c.lon),
-      createdAt: c.created_at,
-    })),
-    helpCount: checkins.filter((c) => c.status === "help").length,
+    checkins: checkinList,
+    helpCount: checkinList.filter((c) => c.status === "help").length,
   };
 }

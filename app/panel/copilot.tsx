@@ -4,15 +4,24 @@ import { useState } from "react";
 
 // Copiloto agéntico del coordinador: pregunta en lenguaje natural; un agente
 // Mistral decide qué herramientas del sistema consultar y razona la respuesta.
+
+const CHIPS = [
+  "Resume la situación",
+  "¿Qué zona priorizo?",
+  "¿Cuántos necesitan ayuda?",
+  "¿Qué disparó la alerta?",
+];
+
 export function Copilot() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [toolsUsed, setToolsUsed] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
 
-  async function ask() {
-    const q = question.trim();
+  async function ask(preset?: string) {
+    const q = (preset ?? question).trim();
     if (!q || loading) return;
+    setQuestion(q);
     setLoading(true);
     setAnswer(null);
     setToolsUsed([]);
@@ -37,71 +46,72 @@ export function Copilot() {
   }
 
   return (
-    <section
-      style={{
-        background: "#ffffff",
-        border: "1px solid #e5e7eb",
-        borderRadius: 12,
-        padding: "1rem 1.25rem",
-        marginTop: 16,
-      }}
-    >
-      <h2
+    <section className="copilot">
+      <div
         style={{
-          margin: "0 0 .6rem",
-          fontSize: 13,
-          textTransform: "uppercase",
-          letterSpacing: ".06em",
-          color: "#6b7280",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
         }}
       >
-        Copiloto del coordinador · agente IA
-      </h2>
-      <div style={{ display: "flex", gap: 8 }}>
+        <span className="ai-mark">∿</span>
+        <span className="section-title">Copiloto IA</span>
+        <span className="chip cyan" style={{ fontSize: 10, padding: "3px 8px" }}>
+          Mistral · agente
+        </span>
+      </div>
+
+      <div className="answer">
+        {loading
+          ? "Consultando el sistema en vivo…"
+          : (answer ??
+            "Pregúntame sobre el estado actual. Consulto los datos en vivo con mis herramientas y razono la respuesta.")}
+      </div>
+
+      {toolsUsed.length > 0 && (
+        <div
+          className="mono"
+          style={{ marginTop: 6, fontSize: 11, color: "var(--ink-3)" }}
+        >
+          Herramientas consultadas: {toolsUsed.join(", ")}
+        </div>
+      )}
+
+      <div className="label" style={{ marginTop: 16 }}>
+        Consultas rápidas
+      </div>
+      <div
+        style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}
+      >
+        {CHIPS.map((c) => (
+          <button
+            key={c}
+            className="prompt-chip"
+            onClick={() => ask(c)}
+            disabled={loading}
+          >
+            {c}
+          </button>
+        ))}
+      </div>
+
+      <div className="input-row">
+        <span style={{ color: "var(--ink-3)", fontSize: 14 }}>›</span>
         <input
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") ask();
           }}
-          placeholder="Pregunta sobre el estado actual..."
-          style={{
-            flex: 1,
-            padding: ".55rem .7rem",
-            border: "1px solid #d1d5db",
-            borderRadius: 8,
-            fontSize: 14,
-          }}
+          placeholder="Pregunta al copiloto…"
         />
         <button
-          onClick={ask}
+          className="send-btn"
+          onClick={() => ask()}
           disabled={loading}
-          style={{
-            padding: ".55rem 1.1rem",
-            border: "none",
-            borderRadius: 8,
-            background: loading ? "#93c5fd" : "#2563eb",
-            color: "#ffffff",
-            fontSize: 14,
-            cursor: loading ? "default" : "pointer",
-          }}
         >
-          {loading ? "..." : "Preguntar"}
+          {loading ? "…" : "Enviar"}
         </button>
-      </div>
-      {answer && (
-        <p style={{ marginTop: ".75rem", whiteSpace: "pre-wrap", lineHeight: 1.55 }}>
-          {answer}
-        </p>
-      )}
-      {toolsUsed.length > 0 && (
-        <div style={{ marginTop: ".4rem", fontSize: 12, color: "#9ca3af" }}>
-          El agente consultó: {toolsUsed.join(", ")}
-        </div>
-      )}
-      <div style={{ marginTop: ".5rem", fontSize: 12, color: "#9ca3af" }}>
-        Ej.: &quot;resume la situación&quot; · &quot;¿cuántos necesitan ayuda y
-        dónde?&quot; · &quot;¿qué zona priorizo?&quot;
       </div>
     </section>
   );
