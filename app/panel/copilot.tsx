@@ -5,6 +5,7 @@ import { useState } from "react";
 // Copiloto agéntico del coordinador: pregunta en lenguaje natural; un agente
 // Mistral decide qué herramientas del sistema consultar y razona la respuesta.
 // Voz: dictado (STT) y lectura (TTS) con la Web Speech API nativa del navegador.
+// En modo "Comando voz" la respuesta se lee en voz alta automáticamente.
 
 const CHIPS = [
   "Resume la situación",
@@ -35,6 +36,7 @@ export function Copilot() {
   const [loading, setLoading] = useState(false);
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
 
   async function ask(preset?: string) {
     const q = (preset ?? question).trim();
@@ -53,6 +55,7 @@ export function Copilot() {
       if (data.ok) {
         setAnswer(data.answer);
         setToolsUsed(Array.isArray(data.toolsUsed) ? data.toolsUsed : []);
+        if (voiceMode && typeof data.answer === "string") speak(data.answer);
       } else {
         setAnswer(`Error: ${data.error ?? "desconocido"}`);
       }
@@ -63,16 +66,12 @@ export function Copilot() {
     }
   }
 
-  // TTS — lee la respuesta del copiloto en voz alta.
-  function toggleSpeak() {
+  // TTS — lee un texto en voz alta (Web Speech API).
+  function speak(text: string) {
     const synth = window.speechSynthesis;
-    if (!synth || !answer) return;
-    if (speaking) {
-      synth.cancel();
-      setSpeaking(false);
-      return;
-    }
-    const clean = answer.replace(/[*#_`>]/g, "").trim();
+    if (!synth) return;
+    const clean = text.replace(/[*#_`>]/g, "").trim();
+    if (!clean) return;
     const u = new SpeechSynthesisUtterance(clean);
     u.lang = "es-ES";
     u.rate = 1.05;
@@ -85,6 +84,16 @@ export function Copilot() {
     synth.cancel();
     setSpeaking(true);
     synth.speak(u);
+  }
+
+  function toggleSpeak() {
+    if (!answer) return;
+    if (speaking) {
+      window.speechSynthesis?.cancel();
+      setSpeaking(false);
+      return;
+    }
+    speak(answer);
   }
 
   // STT — dicta la pregunta por voz.
@@ -121,12 +130,34 @@ export function Copilot() {
 
   return (
     <section className="copilot">
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+        }}
+      >
         <span className="ai-mark">∿</span>
         <span className="section-title">Copiloto IA</span>
         <span className="chip cyan" style={{ fontSize: 10, padding: "3px 8px" }}>
           Mistral · agente
         </span>
+        <span style={{ flex: 1 }} />
+        <div className="voice-switch">
+          <button
+            className={voiceMode ? "" : "on"}
+            onClick={() => setVoiceMode(false)}
+          >
+            Solo texto
+          </button>
+          <button
+            className={voiceMode ? "on" : ""}
+            onClick={() => setVoiceMode(true)}
+          >
+            Comando voz
+          </button>
+        </div>
       </div>
 
       <div className="answer">

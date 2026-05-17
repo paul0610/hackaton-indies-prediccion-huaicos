@@ -54,6 +54,16 @@
   box-shadow: none !important;
 }
 .leaflet-tooltip-top:before { border-top-color: rgba(255, 255, 255, 0.16) !important; }
+.leaflet-control-zoom { border: 1px solid var(--border) !important; box-shadow: none !important; }
+.leaflet-control-zoom a {
+  background: rgba(15, 20, 27, 0.9) !important;
+  color: var(--ink-1) !important;
+  border-bottom-color: var(--border) !important;
+}
+.leaflet-control-zoom a:hover {
+  background: rgba(35, 44, 61, 0.95) !important;
+  color: var(--ink-0) !important;
+}
 
 /* ---- Animations ---- */
 @keyframes tp-pulse {
@@ -335,6 +345,18 @@
   background: var(--cyan-soft);
 }
 .voice-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* ---- Switch comando voz / solo texto ---- */
+.voice-switch {
+  display: inline-flex; border: 1px solid var(--border-strong);
+  border-radius: 999px; padding: 2px;
+}
+.voice-switch button {
+  background: transparent; border: none; border-radius: 999px;
+  padding: 4px 9px; font-family: var(--font-mono); font-size: 10px;
+  color: var(--ink-3); letter-spacing: 0.03em; white-space: nowrap;
+}
+.voice-switch button.on { background: var(--cyan-soft); color: var(--cyan); }
 
 /* ---- Help queue ---- */
 .queue-list {
