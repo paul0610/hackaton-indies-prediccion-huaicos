@@ -3,6 +3,7 @@ import { env } from "@/lib/env";
 // Cliente de Mistral AI. API REST. Docs: https://docs.mistral.ai/api/
 
 const API_URL = "https://api.mistral.ai/v1/chat/completions";
+const EMBED_URL = "https://api.mistral.ai/v1/embeddings";
 const DEFAULT_MODEL = "mistral-small-latest";
 
 export interface ChatMessage {
@@ -38,6 +39,30 @@ export async function chatComplete(
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error("Mistral devolvió una respuesta vacía");
   return content.trim();
+}
+
+/** Devuelve un vector de embedding por cada texto (modelo mistral-embed). */
+export async function embed(texts: string[]): Promise<number[][]> {
+  const res = await fetch(EMBED_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${env.mistralApiKey()}`,
+    },
+    body: JSON.stringify({ model: "mistral-embed", input: texts }),
+  });
+  if (!res.ok) {
+    const detail = await res.text();
+    throw new Error(
+      `Mistral embeddings falló (HTTP ${res.status}): ${detail.slice(0, 200)}`,
+    );
+  }
+  const data = (await res.json()) as { data?: { embedding?: number[] }[] };
+  const vectors = (data.data ?? []).map((d) => d.embedding ?? []);
+  if (vectors.length !== texts.length) {
+    throw new Error("Mistral embeddings: número de vectores inesperado");
+  }
+  return vectors;
 }
 
 // ---- Agente con herramientas (function calling) ----

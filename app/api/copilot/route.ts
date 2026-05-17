@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCoordinatorView } from "@/lib/dashboard";
 import { runAgent, type AgentTool } from "@/lib/mistral";
+import { retrieveKnowledge } from "@/lib/knowledge";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,25 @@ const TOOLS: AgentTool[] = [
     description: "Últimas alertas emitidas por el sistema.",
     parameters: { type: "object", properties: {} },
   },
+  {
+    name: "consultar_conocimiento",
+    description:
+      "Base de conocimiento del sistema: protocolos de evacuación por nivel, " +
+      "metodología (umbrales, backtest 2017), indicadores de huaico, zonas de " +
+      "Quirio, escalamiento a organismos y guía operativa. Úsala para preguntas " +
+      "de procedimiento, criterio o 'por qué' — no para el estado en vivo.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description:
+            "La pregunta o tema a buscar en la base de conocimiento.",
+        },
+      },
+      required: ["query"],
+    },
+  },
 ];
 
 export async function POST(req: Request) {
@@ -44,7 +64,10 @@ export async function POST(req: Request) {
 
     const view = await getCoordinatorView();
 
-    const execute = async (name: string): Promise<string> => {
+    const execute = async (
+      name: string,
+      args: Record<string, unknown>,
+    ): Promise<string> => {
       switch (name) {
         case "obtener_estado_actual":
           return JSON.stringify({
@@ -63,6 +86,13 @@ export async function POST(req: Request) {
           });
         case "obtener_alertas_recientes":
           return JSON.stringify(view.recentAlerts);
+        case "consultar_conocimiento": {
+          const q =
+            typeof args.query === "string" && args.query.trim()
+              ? args.query
+              : question;
+          return await retrieveKnowledge(q);
+        }
         default:
           return "Herramienta desconocida.";
       }
@@ -71,8 +101,11 @@ export async function POST(req: Request) {
     const system =
       "Eres el copiloto del coordinador de emergencias de un sistema de alerta " +
       "temprana de huaicos (Quebrada Quirio, Chosica). Tienes herramientas para " +
-      "consultar el estado del sistema en vivo: úsalas para responder con datos " +
-      "reales, nunca inventes. Puedes llamar varias herramientas si hace falta. " +
+      "consultar el estado del sistema en vivo y una base de conocimiento con " +
+      "protocolos, metodología e indicadores. Úsalas para responder con datos " +
+      "reales, nunca inventes. Para preguntas de procedimiento, criterio o 'por " +
+      "qué' usa consultar_conocimiento; para el estado actual usa las demás. " +
+      "Puedes llamar varias herramientas si hace falta. " +
       "Responde breve, claro y operativo, en español.";
 
     const { answer, toolsUsed } = await runAgent({
