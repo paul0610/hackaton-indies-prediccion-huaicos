@@ -201,7 +201,7 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
             status, zone_id, lat::text as lat, lon::text as lon,
             created_at::text as created_at
        from citizen_checkins
-      where basin_id = $1
+      where basin_id = $1 and active
       order by telegram_chat_id, created_at desc`,
     [basinId],
   );

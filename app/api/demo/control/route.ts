@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
+import { query } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -33,6 +34,11 @@ export async function POST(req: Request) {
       const evaluate = await fetch(`${origin}/api/cron/evaluate-risk`, {
         headers,
       });
+      // Soft-reset de los check-ins de la demo: se ocultan (active=false),
+      // no se borran — el dato se conserva y la operación es reversible.
+      await query(
+        `update citizen_checkins set active = false where active = true`,
+      );
       return NextResponse.json({
         ok: ingest.ok && evaluate.ok,
         action,
