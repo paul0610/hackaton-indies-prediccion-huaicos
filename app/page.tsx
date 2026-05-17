@@ -55,9 +55,14 @@ export default function Home() {
         </h1>
 
         <p className="lp-lead">
-          Sistema de alerta temprana de huaicos: predice el riesgo con datos
-          reales de lluvia, avisa por Telegram a los vecinos de la quebrada y le
-          da al coordinador de emergencias un panel para responder a tiempo.
+          Alerta temprana de huaicos para la <b>Quebrada Quirio</b> (Chosica,
+          Lima): predice el riesgo con datos reales de lluvia, avisa por
+          Telegram a los vecinos y le da al coordinador de emergencias un panel
+          para responder a tiempo.
+        </p>
+        <p className="lp-scope">
+          Piloto operativo en una cuenca — y un framework para escalar el
+          monitoreo, cuenca por cuenca, al resto del Perú.
         </p>
 
         <div className="lp-actions">
