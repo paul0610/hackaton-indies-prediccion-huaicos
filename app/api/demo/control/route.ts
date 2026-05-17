@@ -29,6 +29,21 @@ export async function POST(req: Request) {
       });
     }
 
+    if (action === "ingesta") {
+      const ingest = await fetch(`${origin}/api/cron/ingest-rain`, { headers });
+      const evaluate = await fetch(`${origin}/api/cron/evaluate-risk`, {
+        headers,
+      });
+      return NextResponse.json({
+        ok: ingest.ok && evaluate.ok,
+        action,
+        result: {
+          ingest: await ingest.json().catch(() => ({})),
+          evaluate: await evaluate.json().catch(() => ({})),
+        },
+      });
+    }
+
     if (action === "calma") {
       const ingest = await fetch(`${origin}/api/cron/ingest-rain`, { headers });
       const evaluate = await fetch(`${origin}/api/cron/evaluate-risk`, {
@@ -50,7 +65,10 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      { ok: false, error: "Acción no reconocida; usa 'evacuacion' o 'calma'." },
+      {
+        ok: false,
+        error: "Acción no reconocida; usa 'evacuacion', 'calma' o 'ingesta'.",
+      },
       { status: 400 },
     );
   } catch (err) {

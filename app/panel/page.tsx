@@ -134,6 +134,9 @@ export default async function Panel() {
           {lv.label}
         </span>
         <span className="chip cyan">⟳ Auto-refresh 6 s</span>
+        <a className="tg-link" href="/admin">
+          Admin
+        </a>
         <Clock />
       </header>
 
