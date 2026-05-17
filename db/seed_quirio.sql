@@ -16,7 +16,7 @@ insert into basins (slug, name, country, region,
                     response_time_min_default,
                     safe_point_name, safe_point_lat, safe_point_lon)
 values ('quirio', 'Quebrada Quirio', 'PE', 'Lima / Chosica',
-        15.00, 25.00, 45,
+        12.00, 25.00, 45,
         'Parque Echenique', -11.938000, -76.696000)
 on conflict (slug) do nothing;
 

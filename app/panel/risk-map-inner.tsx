@@ -1,7 +1,15 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { MapContainer, TileLayer, CircleMarker, Tooltip } from "react-leaflet";
+import { useEffect } from "react";
+import L from "leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  CircleMarker,
+  Tooltip,
+  useMap,
+} from "react-leaflet";
 
 export interface MapPoint {
   lat: number;
@@ -15,6 +23,19 @@ const COLOR: Record<MapPoint["kind"], string> = {
   safe: "#16a34a",
   "safe-point": "#2563eb",
 };
+
+// Encuadra el mapa para que se vean todos los puntos.
+function FitBounds({ points }: { points: MapPoint[] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (points.length === 0) return;
+    const bounds = L.latLngBounds(
+      points.map((p) => [p.lat, p.lon] as [number, number]),
+    );
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 });
+  }, [map, points]);
+  return null;
+}
 
 export default function RiskMapInner({
   center,
@@ -34,6 +55,7 @@ export default function RiskMapInner({
         attribution="&copy; Esri World Imagery"
         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
       />
+      <FitBounds points={points} />
       {points.map((p, i) => (
         <CircleMarker
           key={i}
