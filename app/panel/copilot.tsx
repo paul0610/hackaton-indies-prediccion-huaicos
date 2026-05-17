@@ -4,6 +4,7 @@ import { useState } from "react";
 
 // Copiloto agéntico del coordinador: pregunta en lenguaje natural; un agente
 // Mistral decide qué herramientas del sistema consultar y razona la respuesta.
+// Voz: dictado (STT) y lectura (TTS) con la Web Speech API nativa del navegador.
 
 const CHIPS = [
   "Resume la situación",
@@ -12,11 +13,28 @@ const CHIPS = [
   "¿Qué disparó la alerta?",
 ];
 
+interface SpeechResultEvent {
+  results: ArrayLike<ArrayLike<{ transcript: string }>>;
+}
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  continuous: boolean;
+  start(): void;
+  stop(): void;
+  onresult: ((e: SpeechResultEvent) => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+}
+
 export function Copilot() {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [toolsUsed, setToolsUsed] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [speaking, setSpeaking] = useState(false);
+  const [listening, setListening] = useState(false);
 
   async function ask(preset?: string) {
     const q = (preset ?? question).trim();
@@ -45,15 +63,65 @@ export function Copilot() {
     }
   }
 
+  // TTS — lee la respuesta del copiloto en voz alta.
+  function toggleSpeak() {
+    const synth = window.speechSynthesis;
+    if (!synth || !answer) return;
+    if (speaking) {
+      synth.cancel();
+      setSpeaking(false);
+      return;
+    }
+    const clean = answer.replace(/[*#_`>]/g, "").trim();
+    const u = new SpeechSynthesisUtterance(clean);
+    u.lang = "es-ES";
+    u.rate = 1.05;
+    const esVoice = synth
+      .getVoices()
+      .find((v) => v.lang.toLowerCase().startsWith("es"));
+    if (esVoice) u.voice = esVoice;
+    u.onend = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    synth.cancel();
+    setSpeaking(true);
+    synth.speak(u);
+  }
+
+  // STT — dicta la pregunta por voz.
+  function startListening() {
+    if (listening) return;
+    const w = window as unknown as {
+      SpeechRecognition?: new () => SpeechRecognitionLike;
+      webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+    };
+    const Recognition = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!Recognition) {
+      setAnswer(
+        "El dictado por voz necesita Chrome. Puedes escribir la pregunta.",
+      );
+      return;
+    }
+    const rec = new Recognition();
+    rec.lang = "es-PE";
+    rec.interimResults = false;
+    rec.maxAlternatives = 1;
+    rec.continuous = false;
+    rec.onresult = (e) => {
+      const text = e.results[0]?.[0]?.transcript ?? "";
+      if (text) {
+        setQuestion(text);
+        ask(text);
+      }
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    setListening(true);
+    rec.start();
+  }
+
   return (
     <section className="copilot">
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-        }}
-      >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span className="ai-mark">∿</span>
         <span className="section-title">Copiloto IA</span>
         <span className="chip cyan" style={{ fontSize: 10, padding: "3px 8px" }}>
@@ -68,21 +136,46 @@ export function Copilot() {
             "Pregúntame sobre el estado actual. Consulto los datos en vivo con mis herramientas y razono la respuesta.")}
       </div>
 
-      {toolsUsed.length > 0 && (
+      {answer && !loading && (
         <div
-          className="mono"
-          style={{ marginTop: 6, fontSize: 11, color: "var(--ink-3)" }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            marginTop: 8,
+            flexWrap: "wrap",
+          }}
         >
-          Herramientas consultadas: {toolsUsed.join(", ")}
+          <button
+            className={`voice-btn${speaking ? " active" : ""}`}
+            onClick={toggleSpeak}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              width="13"
+              height="13"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05A4.5 4.5 0 0 0 16.5 12zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06a9 9 0 0 0 0-17.54z" />
+            </svg>
+            {speaking ? "Detener" : "Escuchar"}
+          </button>
+          {toolsUsed.length > 0 && (
+            <span
+              className="mono"
+              style={{ fontSize: 11, color: "var(--ink-3)" }}
+            >
+              Herramientas: {toolsUsed.join(", ")}
+            </span>
+          )}
         </div>
       )}
 
       <div className="label" style={{ marginTop: 16 }}>
         Consultas rápidas
       </div>
-      <div
-        style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}
-      >
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
         {CHIPS.map((c) => (
           <button
             key={c}
@@ -103,13 +196,25 @@ export function Copilot() {
           onKeyDown={(e) => {
             if (e.key === "Enter") ask();
           }}
-          placeholder="Pregunta al copiloto…"
+          placeholder={listening ? "Escuchando…" : "Pregunta al copiloto…"}
         />
         <button
-          className="send-btn"
-          onClick={() => ask()}
-          disabled={loading}
+          className={`voice-btn${listening ? " active" : ""}`}
+          onClick={startListening}
+          disabled={loading || listening}
+          title="Dictar la pregunta por voz"
         >
+          <svg
+            viewBox="0 0 24 24"
+            width="13"
+            height="13"
+            fill="currentColor"
+            aria-hidden="true"
+          >
+            <path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z" />
+          </svg>
+        </button>
+        <button className="send-btn" onClick={() => ask()} disabled={loading}>
           {loading ? "…" : "Enviar"}
         </button>
       </div>
