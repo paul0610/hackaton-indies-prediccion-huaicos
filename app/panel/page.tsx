@@ -89,6 +89,19 @@ export default async function Panel() {
     a.status === b.status ? 0 : a.status === "help" ? -1 : 1,
   );
 
+  const product = view.rain?.product ?? null;
+  const mode =
+    product === "replay"
+      ? {
+          label: "Modo demo · replay calibrado de Quirio",
+          chip: "orange",
+          dot: "orange",
+        }
+      : product === "open_meteo"
+        ? { label: "Datos en vivo · Open-Meteo", chip: "green", dot: "green" }
+        : { label: "Sin datos de lluvia", chip: "", dot: "" };
+  const pipelineOk = view.lastRealPullAt !== null;
+
   return (
     <main className="tp-app">
       <AutoRefresh seconds={6} />
@@ -110,6 +123,47 @@ export default async function Panel() {
         <span className="chip cyan">⟳ Auto-refresh 6 s</span>
         <Clock />
       </header>
+
+      <div className="tp-strip">
+        <span className={`chip ${mode.chip}`}>
+          <span
+            className={`tp-dot${mode.dot ? " " + mode.dot : ""}`}
+            style={{ width: 7, height: 7 }}
+          />
+          {mode.label}
+        </span>
+        <span className="strip-item">
+          Fuente lluvia · <b>Open-Meteo</b>
+        </span>
+        <span className="strip-item">
+          Último pull real ·{" "}
+          {view.lastRealPullAt ? (
+            <Elapsed since={view.lastRealPullAt} />
+          ) : (
+            "sin registro"
+          )}
+        </span>
+        <span className="strip-item">
+          Modelo ·{" "}
+          {snap ? (
+            <>
+              calculado <Elapsed since={snap.computedAt} />
+            </>
+          ) : (
+            "sin correr"
+          )}
+        </span>
+        <span className="strip-item">
+          Pipeline ·{" "}
+          <b style={{ color: pipelineOk ? "var(--green)" : "var(--amber)" }}>
+            {pipelineOk ? "operativo" : "sin pull real"}
+          </b>
+        </span>
+        <span style={{ flex: 1 }} />
+        <span className="strip-item">
+          Riesgo por cuenca · prioridad operativa por zona
+        </span>
+      </div>
 
       <div className="tp-main">
         {/* ─── Fila 1: hero + KPIs ─── */}

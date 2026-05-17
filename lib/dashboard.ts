@@ -17,7 +17,10 @@ export interface CoordinatorView {
     rain6hMm: number;
     rain24hMm: number;
     observedAt: string;
+    product: string;
   } | null;
+  /** Timestamp del último pull real de Open-Meteo (independiente del replay de demo). */
+  lastRealPullAt: string | null;
   susceptibility: { score: number; band: string | null } | null;
   incident: { level: string; openedAt: string } | null;
   zones: {
@@ -65,6 +68,7 @@ const EMPTY: CoordinatorView = {
   basin: null,
   snapshot: null,
   rain: null,
+  lastRealPullAt: null,
   susceptibility: null,
   incident: null,
   zones: [],
@@ -105,11 +109,24 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
     rain_3h_mm: string | null;
     rain_6h_mm: string | null;
     rain_24h_mm: string | null;
+    product: string;
     observed_at: string;
   }>(
-    `select rain_3h_mm, rain_6h_mm, rain_24h_mm, observed_at::text as observed_at
+    `select rain_3h_mm, rain_6h_mm, rain_24h_mm, product,
+            observed_at::text as observed_at
        from rain_observations
       where basin_id = $1
+      order by observed_at desc
+      limit 1`,
+    [basinId],
+  );
+
+  // Último pull real de Open-Meteo: puede diferir de la observación más
+  // reciente si un replay de demo escribió datos después.
+  const lastReal = await query<{ observed_at: string }>(
+    `select observed_at::text as observed_at
+       from rain_observations
+      where basin_id = $1 and product = 'open_meteo'
       order by observed_at desc
       limit 1`,
     [basinId],
@@ -219,8 +236,10 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
             rain6hMm: n(rain[0].rain_6h_mm),
             rain24hMm: n(rain[0].rain_24h_mm),
             observedAt: rain[0].observed_at,
+            product: rain[0].product,
           }
         : null,
+    lastRealPullAt: lastReal.length > 0 ? lastReal[0].observed_at : null,
     susceptibility:
       susc.length > 0
         ? {
