@@ -29,7 +29,11 @@ interface SpeechRecognitionLike {
   onerror: (() => void) | null;
 }
 
-export function Copilot() {
+export function Copilot({
+  onMapFocus,
+}: {
+  onMapFocus: (value: string) => void;
+}) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [toolsUsed, setToolsUsed] = useState<string[]>([]);
@@ -37,6 +41,7 @@ export function Copilot() {
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
 
   async function ask(preset?: string) {
     const q = (preset ?? question).trim();
@@ -55,6 +60,10 @@ export function Copilot() {
       if (data.ok) {
         setAnswer(data.answer);
         setToolsUsed(Array.isArray(data.toolsUsed) ? data.toolsUsed : []);
+        setSuggestions(
+          Array.isArray(data.suggestions) ? data.suggestions : [],
+        );
+        if (typeof data.mapFocus === "string") onMapFocus(data.mapFocus);
         if (voiceMode && typeof data.answer === "string") speak(data.answer);
       } else {
         setAnswer(`Error: ${data.error ?? "desconocido"}`);
@@ -207,7 +216,7 @@ export function Copilot() {
         Consultas rápidas
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-        {CHIPS.map((c) => (
+        {(suggestions.length > 0 ? suggestions : CHIPS).map((c) => (
           <button
             key={c}
             className="prompt-chip"

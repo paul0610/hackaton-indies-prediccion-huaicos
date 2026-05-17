@@ -11,7 +11,13 @@ import {
   Tooltip,
   useMap,
 } from "react-leaflet";
-import type { MapZone, MapCheckin, MapSafePoint, MapLayer } from "./risk-map";
+import type {
+  MapZone,
+  MapCheckin,
+  MapSafePoint,
+  MapLayer,
+  MapFocus,
+} from "./risk-map";
 
 // Encuadra el mapa una sola vez, cuando llegan los primeros puntos.
 function FitBounds({ pts }: { pts: [number, number][] }) {
@@ -22,6 +28,56 @@ function FitBounds({ pts }: { pts: [number, number][] }) {
     map.fitBounds(L.latLngBounds(pts), { padding: [50, 50], maxZoom: 15 });
     done.current = true;
   }, [map, pts]);
+  return null;
+}
+
+// Vuela el mapa hacia un conjunto de puntos cuando el copiloto lo pide.
+function FocusOn({
+  focus,
+  zones,
+  checkins,
+  safePoints,
+}: {
+  focus: MapFocus | null;
+  zones: MapZone[];
+  checkins: MapCheckin[];
+  safePoints: MapSafePoint[];
+}) {
+  const map = useMap();
+  const dataRef = useRef({ zones, checkins, safePoints });
+  dataRef.current = { zones, checkins, safePoints };
+  useEffect(() => {
+    if (!focus) return;
+    const d = dataRef.current;
+    let pts: [number, number][] = [];
+    if (focus.value === "ayuda") {
+      pts = d.checkins
+        .filter((c) => c.status === "help")
+        .map((c) => [c.lat, c.lon] as [number, number]);
+    } else if (focus.value === "ciudadanos") {
+      pts = d.checkins.map((c) => [c.lat, c.lon] as [number, number]);
+    } else if (focus.value === "zonas") {
+      pts = d.zones.map((z) => [z.lat, z.lon] as [number, number]);
+    } else if (focus.value === "refugios") {
+      pts = d.safePoints.map((s) => [s.lat, s.lon] as [number, number]);
+    } else {
+      pts = [
+        ...d.zones.map((z) => [z.lat, z.lon] as [number, number]),
+        ...d.checkins.map((c) => [c.lat, c.lon] as [number, number]),
+        ...d.safePoints.map((s) => [s.lat, s.lon] as [number, number]),
+      ];
+    }
+    if (pts.length === 0) return;
+    if (pts.length === 1) {
+      map.flyTo(pts[0], 16, { duration: 1.1 });
+    } else {
+      map.flyToBounds(L.latLngBounds(pts), {
+        padding: [70, 70],
+        maxZoom: 16,
+        duration: 1.1,
+      });
+    }
+  }, [map, focus]);
   return null;
 }
 
@@ -74,12 +130,14 @@ export default function RiskMapInner({
   checkins,
   safePoints,
   layer,
+  focus,
 }: {
   center: [number, number];
   zones: MapZone[];
   checkins: MapCheckin[];
   safePoints: MapSafePoint[];
   layer: MapLayer;
+  focus: MapFocus | null;
 }) {
   const allPts: [number, number][] = [
     ...zones.map((z) => [z.lat, z.lon] as [number, number]),
@@ -102,6 +160,12 @@ export default function RiskMapInner({
       />
       <ZoomControl position="bottomright" />
       <FitBounds pts={allPts} />
+      <FocusOn
+        focus={focus}
+        zones={zones}
+        checkins={checkins}
+        safePoints={safePoints}
+      />
 
       {layer === "zonas" &&
         zones.map((z, i) => (

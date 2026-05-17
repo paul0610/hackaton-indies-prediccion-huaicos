@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCoordinatorView } from "@/lib/dashboard";
-import { runAgent, type AgentTool } from "@/lib/mistral";
+import { runAgent, chatComplete, type AgentTool } from "@/lib/mistral";
 import { retrieveKnowledge } from "@/lib/knowledge";
 
 export const dynamic = "force-dynamic";
@@ -48,7 +48,31 @@ const TOOLS: AgentTool[] = [
       required: ["query"],
     },
   },
+  {
+    name: "enfocar_mapa",
+    description:
+      "Enfoca el mapa del coordinador. Llámala cuando el usuario pida VER, " +
+      "MOSTRAR o UBICAR algo en el mapa (ej: 'muéstrame los damnificados', " +
+      "'dónde están los refugios', 'enfoca las zonas'). Cambia la capa visible " +
+      "y centra el mapa en lo solicitado.",
+    parameters: {
+      type: "object",
+      properties: {
+        foco: {
+          type: "string",
+          enum: ["ayuda", "ciudadanos", "zonas", "refugios", "todo"],
+          description:
+            "Qué resaltar: 'ayuda' = vecinos que piden ayuda (damnificados); " +
+            "'ciudadanos' = todos los check-ins; 'zonas' = zonas pobladas; " +
+            "'refugios' = puntos seguros; 'todo' = vista general.",
+        },
+      },
+      required: ["foco"],
+    },
+  },
 ];
+
+const FOCI = ["ayuda", "ciudadanos", "zonas", "refugios", "todo"];
 
 export async function POST(req: Request) {
   try {
@@ -63,6 +87,9 @@ export async function POST(req: Request) {
     }
 
     const view = await getCoordinatorView();
+
+    // El agente puede pedir enfocar el mapa; aquí capturamos esa intención.
+    let mapFocus: string | null = null;
 
     const execute = async (
       name: string,
@@ -93,6 +120,14 @@ export async function POST(req: Request) {
               : question;
           return await retrieveKnowledge(q);
         }
+        case "enfocar_mapa": {
+          const foco =
+            typeof args.foco === "string" && FOCI.includes(args.foco)
+              ? args.foco
+              : "todo";
+          mapFocus = foco;
+          return `Mapa enfocado en: ${foco}.`;
+        }
         default:
           return "Herramienta desconocida.";
       }
@@ -101,12 +136,12 @@ export async function POST(req: Request) {
     const system =
       "Eres el copiloto del coordinador de emergencias de un sistema de alerta " +
       "temprana de huaicos (Quebrada Quirio, Chosica). Tienes herramientas para " +
-      "consultar el estado del sistema en vivo y una base de conocimiento con " +
-      "protocolos, metodología e indicadores. Úsalas para responder con datos " +
-      "reales, nunca inventes. Para preguntas de procedimiento, criterio o 'por " +
-      "qué' usa consultar_conocimiento; para el estado actual usa las demás. " +
-      "Puedes llamar varias herramientas si hace falta. " +
-      "Responde breve, claro y operativo, en español.";
+      "consultar el estado del sistema en vivo, una base de conocimiento y el " +
+      "control del mapa. Úsalas para responder con datos reales, nunca inventes. " +
+      "Para procedimiento o 'por qué' usa consultar_conocimiento; para el estado " +
+      "usa las de consulta. Si el usuario pide ver, mostrar o ubicar algo en el " +
+      "mapa, llama enfocar_mapa además de responder. Puedes llamar varias " +
+      "herramientas. Responde breve, claro y operativo, en español.";
 
     const { answer, toolsUsed } = await runAgent({
       system,
@@ -115,7 +150,41 @@ export async function POST(req: Request) {
       execute,
     });
 
-    return NextResponse.json({ ok: true, answer, toolsUsed });
+    // Consultas rápidas dinámicas: 3 preguntas de seguimiento contextuales.
+    let suggestions: string[] = [];
+    try {
+      const raw = await chatComplete(
+        [
+          {
+            role: "system",
+            content:
+              "Genera exactamente 3 preguntas de seguimiento muy cortas " +
+              "(máximo 6 palabras cada una) para el copiloto de un coordinador " +
+              "de emergencias de huaicos. Una por línea, sin numerar ni viñetas.",
+          },
+          {
+            role: "user",
+            content: `Pregunta: ${question}\nRespuesta: ${answer}`,
+          },
+        ],
+        { maxTokens: 90, temperature: 0.5 },
+      );
+      suggestions = raw
+        .split("\n")
+        .map((s) => s.replace(/^[-*\d.\s]+/, "").trim())
+        .filter((s) => s.length > 3 && s.length < 60)
+        .slice(0, 3);
+    } catch {
+      suggestions = [];
+    }
+
+    return NextResponse.json({
+      ok: true,
+      answer,
+      toolsUsed,
+      mapFocus,
+      suggestions,
+    });
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: (err as Error).message },

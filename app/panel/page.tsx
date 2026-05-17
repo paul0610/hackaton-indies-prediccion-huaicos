@@ -1,13 +1,8 @@
 import "./panel.css";
 import { getCoordinatorView } from "@/lib/dashboard";
 import { AutoRefresh } from "./auto-refresh";
-import { Copilot } from "./copilot";
-import {
-  RiskMap,
-  type MapZone,
-  type MapCheckin,
-  type MapSafePoint,
-} from "./risk-map";
+import { PanelStage } from "./panel-stage";
+import type { MapZone, MapCheckin, MapSafePoint } from "./risk-map";
 import { Clock, Elapsed } from "./live";
 import { DemoControls } from "./demo-controls";
 
@@ -280,15 +275,12 @@ export default async function Panel() {
         </section>
 
         {/* ─── Fila 2: mapa + columna derecha ─── */}
-        <section className="row-2">
-          <RiskMap
-            center={[-11.936, -76.697]}
-            zones={mapZones}
-            checkins={mapCheckins}
-            safePoints={mapSafePoints}
-          />
-          <div className="right-col">
-            <Copilot />
+        <PanelStage
+          center={[-11.936, -76.697]}
+          zones={mapZones}
+          checkins={mapCheckins}
+          safePoints={mapSafePoints}
+        >
             <div className="card">
               <div
                 style={{
@@ -367,8 +359,7 @@ export default async function Panel() {
                 </p>
               )}
             </div>
-          </div>
-        </section>
+        </PanelStage>
 
         {/* ─── Fila 3: tarjetas de detalle ─── */}
         <section className="row-3">

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface MapZone {
   name: string;
@@ -22,7 +22,11 @@ export interface MapSafePoint {
 }
 export type MapLayer = "zonas" | "ciudadanos" | "refugios";
 
-// Leaflet necesita `window`: se carga solo en el cliente (ssr: false).
+/** Petición del copiloto para enfocar el mapa. Objeto nuevo por petición. */
+export interface MapFocus {
+  value: string;
+}
+
 const RiskMapInner = dynamic(() => import("./risk-map-inner"), {
   ssr: false,
   loading: () => (
@@ -48,18 +52,31 @@ const LAYERS: { id: MapLayer; label: string }[] = [
   { id: "refugios", label: "Refugios" },
 ];
 
+function layerForFocus(value: string): MapLayer {
+  if (value === "ayuda" || value === "ciudadanos") return "ciudadanos";
+  if (value === "refugios") return "refugios";
+  return "zonas";
+}
+
 export function RiskMap({
   center,
   zones,
   checkins,
   safePoints,
+  focus,
 }: {
   center: [number, number];
   zones: MapZone[];
   checkins: MapCheckin[];
   safePoints: MapSafePoint[];
+  focus: MapFocus | null;
 }) {
   const [layer, setLayer] = useState<MapLayer>("zonas");
+
+  // El copiloto puede pedir enfocar el mapa: ajustamos la capa al foco.
+  useEffect(() => {
+    if (focus) setLayer(layerForFocus(focus.value));
+  }, [focus]);
 
   return (
     <div className="map-wrap">
@@ -69,6 +86,7 @@ export function RiskMap({
         checkins={checkins}
         safePoints={safePoints}
         layer={layer}
+        focus={focus}
       />
 
       <div className="map-top">
