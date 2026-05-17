@@ -27,7 +27,7 @@ const SCENARIO: ReplayStep[] = [
   },
   {
     label: "Lluvia en la cuenca alta",
-    rain3h: 9, rain6h: 14, rain24h: 28, rain72h: 40, rain7d: 55,
+    rain3h: 6, rain6h: 10, rain24h: 28, rain72h: 40, rain7d: 55,
     hasOfficialSignal: false,
   },
   {

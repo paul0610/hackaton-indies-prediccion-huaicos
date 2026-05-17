@@ -21,6 +21,13 @@ const LEVEL_ES: Record<AlertLevel, string> = {
   watch: "VIGILANCIA",
 };
 
+/** Indicador visual de severidad — coherente con el semáforo del panel. */
+const LEVEL_ICON: Record<AlertLevel, string> = {
+  evacuate: "🔴",
+  prealert: "🟠",
+  watch: "🟡",
+};
+
 /** Botones inline para que el vecino responda a la alerta. */
 const ACK_KEYBOARD = {
   inline_keyboard: [
@@ -74,6 +81,7 @@ async function generateMessage(
   safePoint: string | null,
   etaMin: number,
 ): Promise<string> {
+  let body: string;
   try {
     const sp = safePoint ?? "el punto seguro asignado";
     const intent =
@@ -91,7 +99,7 @@ async function generateMessage(
     const user =
       `Nivel: ${LEVEL_ES[level]}. Zona: ${zoneName}. Punto seguro: ${sp}. ` +
       `Tiempo estimado de impacto: ${etaMin} minutos. ${intent}`;
-    return await chatComplete(
+    body = await chatComplete(
       [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -100,8 +108,10 @@ async function generateMessage(
     );
   } catch (err) {
     console.error("Generación de alerta con Mistral falló, uso plantilla:", err);
-    return buildTemplate(level, basinName, zoneName, safePoint, etaMin);
+    body = buildTemplate(level, basinName, zoneName, safePoint, etaMin);
   }
+  // El ícono de severidad se antepone aquí para ambos caminos (LLM y plantilla).
+  return `${LEVEL_ICON[level]} ${body}`;
 }
 
 /**

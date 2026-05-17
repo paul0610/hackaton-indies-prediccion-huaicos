@@ -89,11 +89,12 @@ export async function runRiskEvaluation(
   const rain24h = num(rain[0].rain_24h_mm);
   const rain72h = num(rain[0].rain_72h_mm);
   const rain7d = num(rain[0].rain_7d_mm);
+  const awi = antecedentWetnessIndex(rain24h, rain72h, rain7d);
 
   const result = evaluateRisk({
     rain3hMm: num(rain[0].rain_3h_mm),
     rain6hMm: num(rain[0].rain_6h_mm),
-    antecedentWetnessIndex: antecedentWetnessIndex(rain24h, rain72h, rain7d),
+    antecedentWetnessIndex: awi,
     baseThreshold3hMm: basin.baseThreshold3hMm,
     susceptibilityScore: susc.length ? Number(susc[0].susceptibility_score) : 0,
     hasOfficialSignal,
@@ -115,7 +116,11 @@ export async function runRiskEvaluation(
       result.effectiveThreshold3hMm,
       result.level,
       result.reasonCode,
-      JSON.stringify({ explanation: result.explanation }),
+      JSON.stringify({
+        explanation: result.explanation,
+        antecedentWetnessIndex: awi,
+        wetnessFactor: result.wetnessFactor,
+      }),
     ],
   );
   const snapshotId = Number(snap[0].id);

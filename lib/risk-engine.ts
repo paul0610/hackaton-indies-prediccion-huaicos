@@ -31,6 +31,8 @@ export interface RiskEngineResult {
   level: RiskLevel;
   reasonCode: string;
   effectiveThreshold3hMm: number;
+  /** Factor 0..1 con el que la humedad antecedente bajó el umbral. */
+  wetnessFactor: number;
   rainTriggered: boolean;
   officialTriggered: boolean;
   citizenTriggered: boolean;
@@ -40,6 +42,12 @@ export interface RiskEngineResult {
 /** Peso con el que la susceptibilidad ML modula el umbral de lluvia. */
 export const SUSCEPTIBILITY_WEIGHT = 0.25;
 
+/** Peso con el que la humedad antecedente del suelo modula el umbral. */
+export const WETNESS_WEIGHT = 0.15;
+
+/** Índice de humedad antecedente (mm) tomado como "suelo saturado". */
+export const WETNESS_SATURATION_MM = 50;
+
 /**
  * Evalúa el nivel de riesgo de una cuenca.
  *
@@ -47,10 +55,16 @@ export const SUSCEPTIBILITY_WEIGHT = 0.25;
  * la regla decide, y el resultado es siempre explicable.
  */
 export function evaluateRisk(input: RiskEngineInput): RiskEngineResult {
-  // El ML modula el umbral: terreno más susceptible => umbral más bajo.
+  // El ML y la humedad antecedente modulan el umbral: terreno más
+  // susceptible o suelo ya saturado por lluvia previa => umbral más bajo.
+  const wetnessFactor = clamp01(
+    input.antecedentWetnessIndex / WETNESS_SATURATION_MM,
+  );
   const effectiveThreshold3hMm = round2(
     input.baseThreshold3hMm *
-      (1 - SUSCEPTIBILITY_WEIGHT * clamp01(input.susceptibilityScore)),
+      (1 -
+        SUSCEPTIBILITY_WEIGHT * clamp01(input.susceptibilityScore) -
+        WETNESS_WEIGHT * wetnessFactor),
   );
 
   const rainTriggered = input.rain3hMm >= effectiveThreshold3hMm;
@@ -59,10 +73,17 @@ export function evaluateRisk(input: RiskEngineInput): RiskEngineResult {
 
   const flags = {
     effectiveThreshold3hMm,
+    wetnessFactor: round2(wetnessFactor),
     rainTriggered,
     officialTriggered,
     citizenTriggered,
   };
+
+  // Nota para la explicación cuando la humedad previa influyó de forma material.
+  const wetnessNote =
+    wetnessFactor >= 0.2
+      ? " El suelo ya venía húmedo por lluvia previa, lo que redujo el umbral."
+      : "";
 
   // EVACUACIÓN: predicción por lluvia + corroboración (oficial o ciudadana).
   if (rainTriggered && (officialTriggered || citizenTriggered)) {
@@ -73,7 +94,8 @@ export function evaluateRisk(input: RiskEngineInput): RiskEngineResult {
       explanation:
         `La lluvia 3h (${input.rain3hMm} mm) cruzó el umbral efectivo ` +
         `(${effectiveThreshold3hMm} mm) y fue corroborada por ` +
-        `${officialTriggered ? "un aviso oficial" : "un reporte ciudadano"}.`,
+        `${officialTriggered ? "un aviso oficial" : "un reporte ciudadano"}.` +
+        wetnessNote,
     };
   }
 
@@ -87,7 +109,8 @@ export function evaluateRisk(input: RiskEngineInput): RiskEngineResult {
         : "official_notice_only",
       explanation: rainTriggered
         ? `La lluvia 3h (${input.rain3hMm} mm) cruzó el umbral efectivo ` +
-          `(${effectiveThreshold3hMm} mm). Aún sin corroboración independiente.`
+          `(${effectiveThreshold3hMm} mm). Aún sin corroboración independiente.` +
+          wetnessNote
         : "Hay un aviso oficial vigente; aún sin señal de lluvia que lo confirme.",
     };
   }
