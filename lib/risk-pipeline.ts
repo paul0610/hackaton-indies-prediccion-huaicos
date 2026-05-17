@@ -47,7 +47,7 @@ export async function runRiskEvaluation(
   const rain = await query<RainRow>(
     `select rain_3h_mm, rain_6h_mm, rain_24h_mm, rain_72h_mm, rain_7d_mm
        from rain_observations
-      where basin_id = $1
+      where basin_id = $1 and active
       order by observed_at desc
       limit 1`,
     [basin.id],

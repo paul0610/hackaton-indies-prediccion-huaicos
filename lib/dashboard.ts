@@ -115,7 +115,7 @@ export async function getCoordinatorView(): Promise<CoordinatorView> {
     `select rain_3h_mm, rain_6h_mm, rain_24h_mm, product,
             observed_at::text as observed_at
        from rain_observations
-      where basin_id = $1
+      where basin_id = $1 and active
       order by observed_at desc
       limit 1`,
     [basinId],

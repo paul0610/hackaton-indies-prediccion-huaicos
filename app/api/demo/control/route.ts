@@ -30,6 +30,10 @@ export async function POST(req: Request) {
     }
 
     if (action === "ingesta") {
+      // Retira las observaciones del replay para que prevalezca el dato real.
+      await query(
+        `update rain_observations set active = false where product = 'replay'`,
+      );
       const ingest = await fetch(`${origin}/api/cron/ingest-rain`, { headers });
       const evaluate = await fetch(`${origin}/api/cron/evaluate-risk`, {
         headers,
@@ -45,6 +49,10 @@ export async function POST(req: Request) {
     }
 
     if (action === "calma") {
+      // Retira las observaciones del replay para que prevalezca el dato real.
+      await query(
+        `update rain_observations set active = false where product = 'replay'`,
+      );
       const ingest = await fetch(`${origin}/api/cron/ingest-rain`, { headers });
       const evaluate = await fetch(`${origin}/api/cron/evaluate-risk`, {
         headers,
