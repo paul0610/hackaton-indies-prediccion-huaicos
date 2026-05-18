@@ -16,9 +16,9 @@ quedan minutos.
 
 Tres capas. **La regla decide, el ML contextualiza, el LLM entiende y comunica, Telegram opera.**
 
-- **Capa 1 — Predicción.** Un scheduler ingiere lluvia satelital (GPM IMERG) de la cuenca alta
-  y evalúa el riesgo con un **umbral hidrometeorológico calibrado** (regla determinista,
-  auditable). Si cruza umbral → `PREALERTA`.
+- **Capa 1 — Predicción.** Un scheduler ingiere la lluvia de la cuenca desde **Open-Meteo**
+  (observada y pronosticada) y evalúa el riesgo con un **umbral hidrometeorológico calibrado**
+  (regla determinista, auditable). Si cruza umbral → `PREALERTA`.
 - **Capa 2 — Corroboración.** Un aviso de SENAMHI o un reporte ciudadano aguas arriba
   *confirman* la amenaza → escala a `EVACUACIÓN`.
 - **Capa 3 — Resiliencia.** Si los feeds públicos fallan, un reporte ciudadano activa un
@@ -38,7 +38,7 @@ decisión de riesgo nunca es una caja negra.
 | LLM                   | Mistral AI                          |
 | Mensajería            | Telegram Bot API                    |
 | Voz (STT / TTS)       | Web Speech API del navegador        |
-| Datos                 | GPM IMERG (NASA) · avisos SENAMHI   |
+| Datos                 | Open-Meteo (lluvia de la cuenca)    |
 
 ## Estructura del repo
 
@@ -60,7 +60,6 @@ la hackathon):
 - **Supabase** — base de datos Postgres + Storage
 - **Telegram** — un bot creado con [@BotFather](https://t.me/BotFather)
 - **Mistral AI** — API key, proveedor LLM (console.mistral.ai, tier gratis)
-- **NASA Earthdata** — cuenta para descargar GPM IMERG
 
 Copia `.env.example` a `.env.local` y completa los valores. **Nunca** commitees `.env.local`.
 
