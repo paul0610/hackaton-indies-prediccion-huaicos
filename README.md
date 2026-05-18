@@ -35,7 +35,7 @@ decisión de riesgo nunca es una caja negra.
 | App + API + dashboard | Next.js + TypeScript (Vercel)       |
 | Base de datos         | Postgres (Supabase)                 |
 | Jobs programados      | Vercel Cron                         |
-| LLM                   | Mistral AI (primario) · OpenRouter (fallback) |
+| LLM                   | Mistral AI                          |
 | Mensajería            | Telegram Bot API                    |
 | Voz (STT / TTS)       | Web Speech API del navegador        |
 | Datos                 | GPM IMERG (NASA) · avisos SENAMHI   |
@@ -59,8 +59,7 @@ la hackathon):
 - **Vercel** — despliegue (conectar este repo)
 - **Supabase** — base de datos Postgres + Storage
 - **Telegram** — un bot creado con [@BotFather](https://t.me/BotFather)
-- **Mistral AI** — API key, proveedor LLM primario (console.mistral.ai, tier gratis)
-- **OpenRouter** — API key, fallback LLM
+- **Mistral AI** — API key, proveedor LLM (console.mistral.ai, tier gratis)
 - **NASA Earthdata** — cuenta para descargar GPM IMERG
 
 Copia `.env.example` a `.env.local` y completa los valores. **Nunca** commitees `.env.local`.
