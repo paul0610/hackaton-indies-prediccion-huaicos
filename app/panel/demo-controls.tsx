@@ -29,6 +29,7 @@ export function DemoControls() {
   return (
     <span
       className="demo-group"
+      data-tour="demo"
       title="Botones solo para la demostración: simulan un evento para probar el flujo completo. El sistema ya está preparado para detectar alertas reales — ingiere lluvia de Open-Meteo y evalúa el riesgo en vivo cada pocos minutos."
     >
       <span className="demo-tag">DEMO</span>

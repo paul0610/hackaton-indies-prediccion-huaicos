@@ -443,3 +443,74 @@
 .section-title {
   font-size: 15px; font-weight: 600; color: var(--ink-0);
 }
+
+/* ---- Tour guiado ---- */
+.tour-launch {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  background: rgba(255, 255, 255, 0.02); color: var(--ink-1);
+  font-family: var(--font-mono); font-size: 12px;
+}
+.tour-launch:hover { background: var(--bg-3); color: var(--ink-0); }
+.tour-launch-q {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 50%;
+  border: 1px solid currentColor;
+  font-size: 10px; font-weight: 700; line-height: 1;
+}
+
+.tp-tour-backdrop { position: fixed; inset: 0; z-index: 9000; }
+.tp-tour-backdrop.veil { background: rgba(8, 11, 16, 0.74); }
+
+.tp-tour-spot {
+  position: fixed; z-index: 9001; border-radius: 12px;
+  border: 1.5px solid var(--cyan);
+  box-shadow:
+    0 0 0 9999px rgba(8, 11, 16, 0.74),
+    0 0 18px rgba(79, 195, 247, 0.5);
+  pointer-events: none;
+}
+
+.tp-tour-pop {
+  position: fixed; z-index: 9100; width: 320px;
+  font-family: var(--font-sans);
+  background: var(--bg-2); border: 1px solid var(--border-strong);
+  border-radius: 12px; padding: 15px 16px 13px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
+  animation: tp-tour-in 0.2s ease;
+}
+.tp-tour-pop.centered { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+@keyframes tp-tour-in { from { opacity: 0; } to { opacity: 1; } }
+.tp-tour-pop .tt-count {
+  font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--cyan);
+}
+.tp-tour-pop .tt-title {
+  font-size: 15px; font-weight: 600; color: var(--ink-0); margin-top: 6px;
+}
+.tp-tour-pop .tt-body {
+  font-size: 13px; line-height: 1.5; color: var(--ink-1); margin-top: 7px;
+}
+.tp-tour-pop .tt-nav {
+  display: flex; align-items: center; gap: 8px; margin-top: 15px;
+}
+.tp-tour-pop .tt-skip {
+  background: none; border: none; cursor: pointer; color: var(--ink-3);
+  font-family: var(--font-mono); font-size: 11px; padding: 4px 2px;
+}
+.tp-tour-pop .tt-skip:hover { color: var(--ink-1); }
+.tp-tour-pop .tt-btn {
+  border: none; cursor: pointer; border-radius: 6px; padding: 6px 13px;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  background: var(--cyan); color: #07223a;
+}
+.tp-tour-pop .tt-btn:hover { background: #6fd0fb; }
+.tp-tour-pop .tt-btn.ghost {
+  background: var(--bg-3); color: var(--ink-1);
+  border: 1px solid var(--border-strong);
+}
+.tp-tour-pop .tt-btn.ghost:hover { background: var(--bg-4); color: var(--ink-0); }
+@media (max-width: 380px) {
+  .tp-tour-pop { width: calc(100vw - 28px); }
+}

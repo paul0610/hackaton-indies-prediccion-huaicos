@@ -208,7 +208,7 @@ export function Copilot({
   }
 
   return (
-    <section className="copilot">
+    <section className="copilot" data-tour="copiloto">
       <div
         style={{
           display: "flex",

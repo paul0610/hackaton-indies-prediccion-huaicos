@@ -5,6 +5,7 @@ import { PanelStage } from "./panel-stage";
 import type { MapZone, MapCheckin, MapSafePoint } from "./risk-map";
 import { Clock, Elapsed } from "./live";
 import { DemoControls } from "./demo-controls";
+import { PanelTour } from "./panel-tour";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,7 @@ export default async function Panel() {
         <span>{basinName}</span>
         <a
           className="tg-link"
+          data-tour="bot"
           href="https://t.me/alerta_huaicos_bot"
           target="_blank"
           rel="noreferrer"
@@ -129,15 +131,16 @@ export default async function Panel() {
           Probar el bot
         </a>
         <span className="spacer" />
-        <span className={`chip ${lv.chip}`}>
+        <span className={`chip ${lv.chip}`} data-tour="nivel">
           <span className={dotCls} style={{ width: 8, height: 8 }} />
           {lv.label}
         </span>
         <span className="chip cyan">⟳ Auto-refresh 6 s</span>
-        <a className="tg-link" href="/admin">
+        <a className="tg-link" data-tour="admin" href="/admin">
           Admin
         </a>
         <Clock />
+        <PanelTour />
       </header>
 
       <div className="tp-strip">
@@ -184,7 +187,7 @@ export default async function Panel() {
 
       <div className="tp-main">
         {/* ─── Fila 1: hero + KPIs ─── */}
-        <section className="row-1">
+        <section className="row-1" data-tour="resumen">
           <div className={`hero ${lv.cls}`}>
             <span className="stripe-l" />
             <div
@@ -284,7 +287,7 @@ export default async function Panel() {
           checkins={mapCheckins}
           safePoints={mapSafePoints}
         >
-            <div className="card">
+            <div className="card" data-tour="cola">
               <div
                 style={{
                   display: "flex",

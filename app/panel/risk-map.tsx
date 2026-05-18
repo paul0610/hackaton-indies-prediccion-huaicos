@@ -79,7 +79,7 @@ export function RiskMap({
   }, [focus]);
 
   return (
-    <div className="map-wrap">
+    <div className="map-wrap" data-tour="mapa">
       <RiskMapInner
         center={center}
         zones={zones}
