@@ -37,7 +37,7 @@ decisión de riesgo nunca es una caja negra.
 | Jobs programados      | Vercel Cron                         |
 | LLM                   | Mistral AI (primario) · OpenRouter (fallback) |
 | Mensajería            | Telegram Bot API                    |
-| Voz / TTS             | MiniMax T2A (voz del copiloto)      |
+| Voz (STT / TTS)       | Web Speech API del navegador        |
 | Datos                 | GPM IMERG (NASA) · avisos SENAMHI   |
 
 ## Estructura del repo
@@ -61,7 +61,6 @@ la hackathon):
 - **Telegram** — un bot creado con [@BotFather](https://t.me/BotFather)
 - **Mistral AI** — API key, proveedor LLM primario (console.mistral.ai, tier gratis)
 - **OpenRouter** — API key, fallback LLM
-- **MiniMax** — API key para la voz del copiloto (TTS)
 - **NASA Earthdata** — cuenta para descargar GPM IMERG
 
 Copia `.env.example` a `.env.local` y completa los valores. **Nunca** commitees `.env.local`.

@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 
 // Copiloto agéntico del coordinador: pregunta en lenguaje natural; un agente
 // Mistral decide qué herramientas del sistema consultar y razona la respuesta.
-// Voz: el dictado (STT) usa la Web Speech API del navegador; la lectura (TTS)
-// usa MiniMax T2A vía /api/tts, con respaldo al TTS nativo si MiniMax no responde.
+// Voz: dictado (STT) y lectura (TTS) con la Web Speech API nativa del navegador.
 // En modo "Comando voz" la respuesta se lee en voz alta automáticamente.
 
 const CHIPS = [
@@ -40,15 +39,9 @@ export function Copilot({
   const [toolsUsed, setToolsUsed] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [speaking, setSpeaking] = useState(false);
-  const [preparing, setPreparing] = useState(false);
-  const [voiceEngine, setVoiceEngine] = useState<
-    "minimax" | "navegador" | null
-  >(null);
   const [listening, setListening] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const speakSeqRef = useRef(0);
 
   async function ask(preset?: string) {
     const q = (preset ?? question).trim();
@@ -82,27 +75,13 @@ export function Copilot({
     }
   }
 
-  // Corta cualquier lectura en curso (audio de MiniMax o TTS del navegador).
-  function stopSpeaking() {
-    speakSeqRef.current++;
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-    window.speechSynthesis?.cancel();
-    setSpeaking(false);
-    setPreparing(false);
-  }
-
-  // Respaldo: TTS nativo del navegador (Web Speech API) si MiniMax no responde.
-  function browserSpeak(text: string) {
+  // TTS — lee un texto en voz alta (Web Speech API).
+  function speak(text: string) {
     const synth = window.speechSynthesis;
-    if (!synth) {
-      setSpeaking(false);
-      setPreparing(false);
-      return;
-    }
-    const u = new SpeechSynthesisUtterance(text);
+    if (!synth) return;
+    const clean = text.replace(/[*#_`>]/g, "").trim();
+    if (!clean) return;
+    const u = new SpeechSynthesisUtterance(clean);
     u.lang = "es-ES";
     u.rate = 1.05;
     const esVoice = synth
@@ -112,64 +91,15 @@ export function Copilot({
     u.onend = () => setSpeaking(false);
     u.onerror = () => setSpeaking(false);
     synth.cancel();
-    setVoiceEngine("navegador");
-    setPreparing(false);
     setSpeaking(true);
     synth.speak(u);
   }
 
-  // TTS — lee la respuesta en voz alta. Primero intenta MiniMax (/api/tts);
-  // si falla (sin key, error de red o autoplay bloqueado) cae al TTS nativo.
-  async function speak(text: string) {
-    const clean = text.replace(/[*#_`>]/g, "").trim();
-    if (!clean) return;
-    stopSpeaking();
-    const seq = ++speakSeqRef.current;
-    setPreparing(true);
-    try {
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ text: clean }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (seq !== speakSeqRef.current) return; // se canceló mientras cargaba
-      if (res.ok && data.ok && typeof data.audioBase64 === "string") {
-        const audio = new Audio(`data:audio/mpeg;base64,${data.audioBase64}`);
-        audioRef.current = audio;
-        audio.onended = () => {
-          setSpeaking(false);
-          audioRef.current = null;
-        };
-        audio.onerror = () => {
-          setSpeaking(false);
-          audioRef.current = null;
-        };
-        try {
-          await audio.play();
-          if (seq !== speakSeqRef.current) {
-            audio.pause();
-            return;
-          }
-          setVoiceEngine("minimax");
-          setPreparing(false);
-          setSpeaking(true);
-          return;
-        } catch {
-          audioRef.current = null; // autoplay bloqueado → respaldo
-        }
-      }
-    } catch {
-      // sin red o MiniMax caído → respaldo
-    }
-    if (seq !== speakSeqRef.current) return;
-    browserSpeak(clean);
-  }
-
   function toggleSpeak() {
     if (!answer) return;
-    if (speaking || preparing) {
-      stopSpeaking();
+    if (speaking) {
+      window.speechSynthesis?.cancel();
+      setSpeaking(false);
       return;
     }
     speak(answer);
@@ -257,7 +187,7 @@ export function Copilot({
           }}
         >
           <button
-            className={`voice-btn${speaking || preparing ? " active" : ""}`}
+            className={`voice-btn${speaking ? " active" : ""}`}
             onClick={toggleSpeak}
           >
             <svg
@@ -269,16 +199,8 @@ export function Copilot({
             >
               <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05A4.5 4.5 0 0 0 16.5 12zM14 3.23v2.06a7 7 0 0 1 0 13.42v2.06a9 9 0 0 0 0-17.54z" />
             </svg>
-            {preparing ? "Generando voz…" : speaking ? "Detener" : "Escuchar"}
+            {speaking ? "Detener" : "Escuchar"}
           </button>
-          {voiceEngine && (
-            <span
-              className={`chip${voiceEngine === "minimax" ? " cyan" : ""}`}
-              style={{ fontSize: 10, padding: "3px 8px" }}
-            >
-              {voiceEngine === "minimax" ? "Voz: MiniMax" : "Voz: navegador"}
-            </span>
-          )}
           {toolsUsed.length > 0 && (
             <span
               className="mono"
